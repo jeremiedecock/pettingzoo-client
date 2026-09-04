@@ -1,0 +1,5 @@
+# Dependencies required to develop the library, installed by the dev container
+# (c.f. ".devcontainer/post-create.sh" of the superproject).
+
+-r requirements-build.txt
+-e .

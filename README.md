@@ -1,1 +1,126 @@
-# Pettingzoo client
+# PettingZoo client
+
+The client library of [`pettingzoo-server`](https://github.com/jeremiedecock/pettingzoo-server):
+it makes a PettingZoo environment served over a REST API usable like a local one.
+
+This is the library the participants of the MARL contest install to connect their agent to the
+shared [`alife`](https://github.com/jeremiedecock/alife) world hosted by the organizers. The
+environment runs on the server, your agent runs on your machine, and everything in between is
+hidden behind the official [PettingZoo parallel
+API](https://pettingzoo.farama.org/api/parallel/).
+
+## Installation
+
+```sh
+pip install pzclient-0.1.0-py3-none-any.whl
+```
+
+The organizers give you the wheel (or the link to it) together with your token. Python 3.12 or
+later is required; `gymnasium`, `numpy`, `pettingzoo`, `pillow` and `requests` are installed as
+dependencies.
+
+## Quick start
+
+```python
+import pettingzoo
+import pzclient  # importing the library registers the remote environments
+
+env = pettingzoo.make(
+    "parallel",
+    "alife/alife-remote-v1",
+    api_url="http://<the server of the contest>/api",
+    token="<your token>",
+)
+
+observations, infos = env.reset()
+
+# The episode is eternal: bound your loop (see "What is special" below)
+for _ in range(1000):
+    actions = {agent: env.action_space(agent).sample() for agent in env.agents}
+    observations, rewards, terminations, truncations, infos = env.step(actions)
+
+env.close()
+```
+
+That is the usual PettingZoo parallel loop: only the two arguments of `make` are specific to the
+remote environment. `pzclient.RemoteParallelEnv(api_url=..., token=...)` builds the same
+environment without the registry.
+
+[`examples/random_agents.py`](examples/random_agents.py) is the same thing, ready to run, with a
+`policy` function to replace by your agent:
+
+```sh
+python examples/random_agents.py --token <your token> \
+                                 --api-url http://<the server of the contest>/api \
+                                 --steps 500
+```
+
+## Your token
+
+Every participant receives a token from the organizers; it identifies you on the server and names
+your agent in the shared world. Pass it as the `token` argument or export it once:
+
+```sh
+export PETTINGZOO_API_URL=http://<the server of the contest>/api
+export PETTINGZOO_TOKEN=<your token>
+```
+
+These two environment variables are the defaults of the `api_url` and `token` arguments.
+
+## The registered environments
+
+| Id | Environment |
+|---|---|
+| `alife/alife-remote-v1` | The `alife` world of the contest; the constructor fails if the server serves anything else. |
+| `remote/parallel-v1` | Whatever parallel environment the server serves (useful to try your agent against an official PettingZoo environment). |
+
+## The API
+
+`RemoteParallelEnv` is a `pettingzoo.ParallelEnv` and implements the whole parallel API:
+`possible_agents`, `agents`, `num_agents`, `max_num_agents`, `observation_space(agent)`,
+`action_space(agent)`, `reset(seed, options)`, `step(actions)`, `render()`, `state()` and
+`close()`. It passes `pettingzoo.test.parallel_api_test`, and it is also a context manager, so
+`with pettingzoo.make(...) as env:` closes the environment for you.
+
+Two additions are specific to the remote environment:
+
+| Method | Role |
+|---|---|
+| `render_png()` | The frame as the PNG bytes the server sends, handy to save a picture of the world without re-encoding it. |
+| `remote_agents()` | Reads `agents` from the server instead of using the local copy, handy after a network error. |
+
+Everything the library raises derives from `pzclient.RemoteEnvError`:
+`AuthenticationError` (your token is missing or refused), `AgentNotConnectedError` (no agent of
+yours is acting: call `reset()`), `InvalidActionError` (the actions do not match the acting agents
+or their spaces) and `ServerUnreachableError` (the server could not be reached).
+
+## What is special about the contest environment
+
+The `alife` world served during the contest departs from the usual PettingZoo assumptions on three
+points, and your agent has to be written accordingly:
+
+- **The episode is eternal.** A bug that dies is reborn at a nest and keeps playing, so no agent
+  ever leaves `agents` and `while env.agents:` never ends. Bound your loop. A death is reported by
+  `infos[agent]["died"]` and by the death penalty in the reward, not by a termination.
+- **The world is shared, and you control a single agent.** All the participants play the same
+  world at the same time; `possible_agents` holds your agent alone, named after you. `reset()`
+  connects a brand new bug of yours to the running world (it does *not* reset the world, and its
+  `seed` and `options` arguments are ignored), and `close()` disconnects it. The participants join
+  and leave at any moment, so the number of bugs around you changes while you play.
+- **The world waits for you, but not forever.** A step is played once every connected participant
+  has sent its action: `step()` blocks until then, which is why the HTTP timeout of the client
+  (60 s by default) is much larger than the step timeout of the server. An agent that answers too
+  late simply does nothing during that step, and an agent that stops answering is eventually
+  disconnected from the world.
+
+## Development
+
+```sh
+pip install -r requirements-dev.txt   # installs the library in editable mode
+pytest                                # the tests need no server
+ruff check pzclient/                  # lint
+python -m build --wheel               # build the wheel given to the participants
+```
+
+The tests replace the HTTP session of the environment by a stand-in of the server, so they run
+offline; `pettingzoo-server` is the place where the two halves are tested together.

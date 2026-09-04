@@ -1,0 +1,557 @@
+"""
+The PettingZoo parallel environments served by `pettingzoo-server`.
+
+`RemoteParallelEnv` implements ``pettingzoo.ParallelEnv`` on top of the REST
+API of the server: every call of the parallel API is an HTTP request, the
+environment itself runs on the server and the agent runs here.  Apart from the
+two constructor arguments (the URL of the API and the token of the
+participant), it is used exactly like a local PettingZoo environment::
+
+    import pettingzoo
+    import pzclient  # registers the remote environments
+
+    env = pettingzoo.make("parallel", "alife/alife-remote-v1", token="token_abc123")
+
+    observations, infos = env.reset()
+
+    for _ in range(1000):
+        actions = {agent: env.action_space(agent).sample() for agent in env.agents}
+        observations, rewards, terminations, truncations, infos = env.step(actions)
+
+    env.close()
+
+The mapping between the parallel API and the endpoints of the server is:
+
+===============================  ==========================
+`RemoteParallelEnv`              Endpoint
+===============================  ==========================
+``__init__``                     ``GET /env``
+``agents`` / ``num_agents``      ``GET /agents``
+``reset``                        ``POST /reset``
+``step``                         ``POST /step``
+``render``                       ``GET /render``
+``state``                        ``GET /state``
+``close``                        ``POST /close``
+===============================  ==========================
+"""
+
+import io
+import logging
+import os
+from typing import Any, Self
+
+from gymnasium import spaces
+import numpy as np
+import pettingzoo
+from PIL import Image
+import requests
+
+from pzclient import serialization
+from pzclient.exceptions import (
+    AgentNotConnectedError,
+    AuthenticationError,
+    InvalidActionError,
+    RemoteEnvError,
+    ServerUnreachableError,
+)
+
+# Configure logging
+logger = logging.getLogger(__name__)
+
+# Base URL of the API of the server, e.g. "http://localhost:8000/api"
+DEFAULT_API_URL = os.getenv("PETTINGZOO_API_URL", "http://localhost:8000/api")
+
+# Token identifying the participant, given by the organizers of the contest
+DEFAULT_TOKEN = os.getenv("PETTINGZOO_TOKEN")
+
+# Timeout of the HTTP requests, in seconds.  It must be larger than the step
+# timeout of the server: in the contest mode a step waits for the actions of
+# all the connected participants before answering.
+DEFAULT_TIMEOUT = 60.0
+
+# The id of the "alife" environment of the contest, in the registry of the
+# server (`alife_parallel_env` refuses to play anything else)
+ALIFE_ENV_ID = "alife/alife-v1"
+
+
+class RemoteParallelEnv(pettingzoo.ParallelEnv):
+    """
+    A PettingZoo parallel environment served by `pettingzoo-server`.
+
+    The instance behaves like the environment it proxies: agent ids are
+    strings, observations and actions are numpy objects and the spaces are the
+    ones of the remote environment.
+
+    The server serves the environment in one of two modes, which the
+    participant does not choose:
+
+    - in the *training* mode, the environment is private: `possible_agents`
+      holds all its agents and the participant drives them all;
+    - in the *contest* mode, a single environment is shared by all the
+      participants and each of them controls exactly one agent of it, named
+      after the participant: `possible_agents` holds that single agent, `reset`
+      connects it to the shared world and `close` disconnects it.  The
+      participants come and go at any moment of an eternal episode, so
+      ``while env.agents:`` never ends: bound the loop of your agent.
+
+    Parameters
+    ----------
+    api_url : str, optional
+        The base URL of the API, e.g. ``"http://localhost:8000/api"``; defaults
+        to the ``PETTINGZOO_API_URL`` environment variable.
+    token : str, optional
+        The token identifying the participant, given by the organizers of the
+        contest; defaults to the ``PETTINGZOO_TOKEN`` environment variable.
+    timeout : float
+        The timeout of the HTTP requests, in seconds.  It must be larger than
+        the step timeout of the server.
+    env_id : str, optional
+        The id of the environment the server is expected to serve; the
+        constructor fails if the server serves another one.
+    session : requests.Session, optional
+        The HTTP session to use; a new one is created by default.
+
+    Attributes
+    ----------
+    agents : list of str
+        The agents currently acting, updated by `reset` and `step`, empty
+        before the first `reset`.
+    possible_agents : list of str
+        All the agents the participant may control.
+    env_id : str
+        The id of the environment served by the server.
+    metadata : dict
+        The metadata of the remote environment.
+    render_mode : str or None
+        The render mode of the remote environment.
+    observation_spaces : dict
+        The observation space of each agent of `possible_agents`.
+    action_spaces : dict
+        The action space of each agent of `possible_agents`.
+
+    Raises
+    ------
+    pzclient.AuthenticationError
+        If no token is given, or if the server refuses it.
+    pzclient.ServerUnreachableError
+        If the server cannot be reached.
+    pzclient.RemoteEnvError
+        If the server does not serve the expected environment.
+    """
+
+    def __init__(
+        self,
+        api_url: str | None = None,
+        token: str | None = None,
+        timeout: float = DEFAULT_TIMEOUT,
+        env_id: str | None = None,
+        session: requests.Session | None = None,
+    ):
+        self.api_url = (api_url or DEFAULT_API_URL).rstrip("/")
+        self.timeout = timeout
+
+        token = token or DEFAULT_TOKEN
+
+        if not token:
+            raise AuthenticationError(
+                "No token: pass 'token=...' to the environment or set the "
+                "'PETTINGZOO_TOKEN' environment variable with the token given "
+                "to you by the organizers of the contest."
+            )
+
+        self._session = session if session is not None else requests.Session()
+        self._session.headers.update({"Authorization": f"Bearer {token}"})
+
+        # No agent is acting before the first reset
+        self.agents: list[str] = []
+
+        description = self._request("GET", "/env")
+
+        self.env_id: str = description["env_id"]
+
+        if env_id is not None and self.env_id != env_id:
+            self._session.close()
+            raise RemoteEnvError(
+                f"The server at {self.api_url} serves '{self.env_id}', "
+                f"not '{env_id}'."
+            )
+
+        self.metadata: dict[str, Any] = description["metadata"]
+        self.render_mode: str | None = description["render_mode"]
+        self.possible_agents: list[str] = description["possible_agents"]
+
+        self.observation_spaces: dict[str, spaces.Space] = {
+            agent: serialization.decode_space(space)
+            for agent, space in description["observation_spaces"].items()
+        }
+        self.action_spaces: dict[str, spaces.Space] = {
+            agent: serialization.decode_space(space)
+            for agent, space in description["action_spaces"].items()
+        }
+
+        logger.info(
+            f"Connected to '{self.env_id}' on {self.api_url} "
+            f"as {', '.join(self.possible_agents)}"
+        )
+
+    ###########################################################################
+    # THE PARALLEL API ########################################################
+    ###########################################################################
+
+    def observation_space(self, agent: str) -> spaces.Space:
+        """
+        Return the observation space of an agent.
+
+        Parameters
+        ----------
+        agent : str
+            The id of the agent.
+
+        Returns
+        -------
+        gymnasium.spaces.Space
+            The observation space of `agent`.
+        """
+        return self.observation_spaces[agent]
+
+    def action_space(self, agent: str) -> spaces.Space:
+        """
+        Return the action space of an agent.
+
+        Parameters
+        ----------
+        agent : str
+            The id of the agent.
+
+        Returns
+        -------
+        gymnasium.spaces.Space
+            The action space of `agent`.
+        """
+        return self.action_spaces[agent]
+
+    def reset(
+        self, seed: int | None = None, options: dict[str, Any] | None = None
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """
+        Start (or restart) the episode and return the first observations.
+
+        In the contest mode the world is shared with the other participants and
+        is therefore never reset: this call connects a brand new agent of yours
+        to the running world, and `seed` and `options` are ignored by the
+        server.
+
+        Parameters
+        ----------
+        seed : int, optional
+            The seed of the episode.
+        options : dict, optional
+            The reset options of the environment.
+
+        Returns
+        -------
+        tuple of dict
+            The initial observations and infos of the agents.
+        """
+        response = self._request(
+            "POST", "/reset", json={"seed": seed, "options": options}
+        )
+
+        self.agents = response["agents"]
+
+        return (
+            serialization.decode_value(response["observations"]),
+            serialization.decode_value(response["infos"]),
+        )
+
+    def step(
+        self, actions: dict[str, Any]
+    ) -> tuple[
+        dict[str, Any],
+        dict[str, float],
+        dict[str, bool],
+        dict[str, bool],
+        dict[str, Any],
+    ]:
+        """
+        Play one parallel step with exactly one action per acting agent.
+
+        In the contest mode, the call returns once the shared world has played
+        the step, which happens as soon as every connected participant has sent
+        its action, and at the latest once the step timeout of the server has
+        expired (an agent that answers too late does nothing during that step).
+
+        Parameters
+        ----------
+        actions : dict
+            The actions of the agents, keyed by agent id.  Exactly one action
+            per agent of `agents` is expected.
+
+        Returns
+        -------
+        tuple of dict
+            The observations, rewards, terminations, truncations and infos of
+            the agents.
+
+        Raises
+        ------
+        pzclient.AgentNotConnectedError
+            If no agent of yours is acting: call `reset` first.
+        pzclient.InvalidActionError
+            If the actions do not match the acting agents or their action
+            spaces.
+        """
+        response = self._request(
+            "POST",
+            "/step",
+            json={"actions": serialization.encode_value(actions)},
+        )
+
+        self.agents = response["agents"]
+
+        return (
+            serialization.decode_value(response["observations"]),
+            response["rewards"],
+            response["terminations"],
+            response["truncations"],
+            serialization.decode_value(response["infos"]),
+        )
+
+    def render(self) -> np.ndarray | None:
+        """
+        Render the current state of the remote environment.
+
+        In the contest mode, this is a picture of the whole shared world: every
+        participant sees the same image.
+
+        Returns
+        -------
+        numpy.ndarray or None
+            The ``(H, W, 3)`` uint8 frame of the current state, as
+            ``render_mode="rgb_array"`` does locally, or ``None`` if the
+            environment does not render anything.
+        """
+        content = self.render_png()
+
+        if content is None:
+            return None
+
+        return np.asarray(Image.open(io.BytesIO(content)))
+
+    def state(self) -> Any:
+        """
+        Return the global state of the remote environment.
+
+        Returns
+        -------
+        Any
+            The global state, as returned by ``ParallelEnv.state``.
+
+        Raises
+        ------
+        pzclient.RemoteEnvError
+            If the remote environment does not implement a global state.
+        """
+        return serialization.decode_value(self._request("GET", "/state")["state"])
+
+    def close(self) -> None:
+        """
+        Leave the environment and release the HTTP session.
+
+        In the contest mode, the agent of the participant leaves the shared
+        world, which keeps living for the other participants; calling `reset`
+        connects a new agent to it.
+        """
+        try:
+            self._request("POST", "/close")
+        except RemoteEnvError as error:
+            logger.warning(f"The environment could not be closed cleanly: {error}")
+        finally:
+            self.agents = []
+            self._session.close()
+
+    ###########################################################################
+    # EXTRAS ##################################################################
+    ###########################################################################
+
+    def render_png(self) -> bytes | None:
+        """
+        Render the current state of the remote environment as a PNG image.
+
+        This is what the server actually sends; `render` decodes it into the
+        numpy frame of the PettingZoo API.
+
+        Returns
+        -------
+        bytes or None
+            The PNG encoded frame, or ``None`` if the environment does not
+            render anything (its ``render_mode`` is ``None``).
+        """
+        if self.render_mode is None:
+            return None
+
+        content = self._request("GET", "/render")
+
+        return content if isinstance(content, bytes) else None
+
+    def remote_agents(self) -> list[str]:
+        """
+        Ask the server which agents of the participant are acting.
+
+        `agents` is the local copy of that list, updated by `reset` and `step`;
+        this method reads it from the server, which is useful after a network
+        error.
+
+        Returns
+        -------
+        list of str
+            The acting agents.
+        """
+        self.agents = self._request("GET", "/agents")["agents"]
+
+        return self.agents
+
+    def __enter__(self) -> Self:
+        """Return the environment, to be used as a context manager."""
+        return self
+
+    def __exit__(self, *exception: object) -> None:
+        """Close the environment when leaving the ``with`` block."""
+        self.close()
+
+    ###########################################################################
+    # HTTP ####################################################################
+    ###########################################################################
+
+    def _request(self, method: str, path: str, **kwargs) -> Any:
+        """
+        Send a request to the API and return its decoded response.
+
+        Parameters
+        ----------
+        method : str
+            The HTTP method of the request.
+        path : str
+            The path of the endpoint, relative to the base URL.
+        **kwargs
+            The extra arguments passed to ``requests.Session.request``.
+
+        Returns
+        -------
+        Any
+            The JSON body of the response, or its raw content for the binary
+            responses (the PNG image of ``/render``).
+
+        Raises
+        ------
+        pzclient.ServerUnreachableError
+            If the server cannot be reached.
+        pzclient.RemoteEnvError
+            If the server answers with an error status; the subclass of the
+            error tells what happened (see `pzclient.exceptions`).
+        """
+        try:
+            response = self._session.request(
+                method, f"{self.api_url}{path}", timeout=self.timeout, **kwargs
+            )
+        except requests.RequestException as error:
+            raise ServerUnreachableError(
+                f"{method} {path} could not reach the server at {self.api_url}: {error}"
+            )
+
+        if not response.ok:
+            raise self._error(method, path, response)
+
+        if response.headers.get("Content-Type", "").startswith("application/json"):
+            return response.json()
+
+        return response.content
+
+    @staticmethod
+    def _error(
+        method: str, path: str, response: requests.Response
+    ) -> RemoteEnvError:
+        """
+        Build the error describing a failed response of the server.
+
+        Parameters
+        ----------
+        method : str
+            The HTTP method of the request.
+        path : str
+            The path of the endpoint.
+        response : requests.Response
+            The failed response.
+
+        Returns
+        -------
+        pzclient.RemoteEnvError
+            The error to raise.
+        """
+        # FastAPI reports the cause of the error in a "detail" field
+        try:
+            detail = response.json().get("detail", response.text)
+        except ValueError:
+            detail = response.text
+
+        error_classes = {
+            401: AuthenticationError,
+            403: AuthenticationError,
+            409: AgentNotConnectedError,
+            422: InvalidActionError,
+        }
+        error_class = error_classes.get(response.status_code, RemoteEnvError)
+
+        return error_class(
+            f"{method} {path} failed [{response.status_code}]: {detail}",
+            status_code=response.status_code,
+        )
+
+
+def parallel_env(**kwargs: Any) -> RemoteParallelEnv:
+    """
+    Instantiate the environment served by `pettingzoo-server`, whatever it is.
+
+    This factory is the entry point registered as ``"remote/parallel-v1"`` in
+    the PettingZoo registry, and the ``parallel_env`` name expected from a
+    PettingZoo environment module.
+
+    Parameters
+    ----------
+    **kwargs
+        The keyword arguments of `RemoteParallelEnv`.
+
+    Returns
+    -------
+    RemoteParallelEnv
+        The environment, ready to be reset.
+    """
+    return RemoteParallelEnv(**kwargs)
+
+
+def alife_parallel_env(**kwargs: Any) -> RemoteParallelEnv:
+    """
+    Instantiate the `alife` environment of the contest, served remotely.
+
+    This factory is the entry point registered as ``"alife/alife-remote-v1"``
+    in the PettingZoo registry.  It is `parallel_env` with a check: the server
+    must really serve the `alife` environment of the contest.
+
+    Parameters
+    ----------
+    **kwargs
+        The keyword arguments of `RemoteParallelEnv`.
+
+    Returns
+    -------
+    RemoteParallelEnv
+        The environment, ready to be reset.
+
+    Raises
+    ------
+    pzclient.RemoteEnvError
+        If the server serves another environment.
+    """
+    kwargs.setdefault("env_id", ALIFE_ENV_ID)
+
+    return RemoteParallelEnv(**kwargs)

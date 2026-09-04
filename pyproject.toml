@@ -1,0 +1,44 @@
+[project]
+authors = [
+    {name = "Jérémie DECOCK", email = "jd.jdhp@gmail.com"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries",
+]
+description = "PettingZoo as-a-Service: the client library"
+dynamic = ["dependencies"]
+name = "pzclient"
+readme = "README.md"
+requires-python = ">=3.12"
+version = "0.1.0"
+
+# [project.scripts]
+# SCRIPT_NAME = "SCRIPT_PATH:SCRIPT_FUNCTION"
+
+[build-system]
+requires = [
+    'setuptools',
+]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = [
+    "pzclient"
+]
+
+# Use requirements.txt to setup dependencies (c.f. https://stackoverflow.com/a/73600610)
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.pytest.ini_options]
+testpaths = [
+    "tests",
+]

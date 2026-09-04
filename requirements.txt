@@ -1,0 +1,10 @@
+# This file lists all the dependencies that are required to use the library.
+
+# To have more information about the format of this file, please refer to the
+# https://pip.pypa.io/en/stable/reference/requirements-file-format/
+
+gymnasium     # The spaces of the observations and of the actions
+numpy         # Observations, actions and states are numpy objects
+pettingzoo    # The parallel API and the registry of the environments
+pillow        # Decodes the PNG frames returned by the "/render" endpoint
+requests      # HTTP client (https://requests.readthedocs.io/en/latest/)

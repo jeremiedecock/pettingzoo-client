@@ -1,0 +1,10 @@
+# Dependencies required to build, test and lint the library.
+
+-r requirements.txt
+build
+coverage
+mypy
+pytest
+ruff
+setuptools
+twine
