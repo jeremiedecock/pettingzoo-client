@@ -9,6 +9,9 @@ environment runs on the server, your agent runs on your machine, and everything 
 hidden behind the official [PettingZoo parallel
 API](https://pettingzoo.farama.org/api/parallel/).
 
+New to the contest? Read the [tutorial](TUTORIAL.md) first: it explains how the world of the contest
+behaves, and how to write an agent that plays it correctly.
+
 ## Installation
 
 ```sh
