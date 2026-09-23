@@ -31,9 +31,11 @@ Two things are worth knowing about this environment:
   ``while env.agents:`` never ends.  Bound your loop, as ``--steps`` does here.
 - **the world is shared**: the other participants play the same world at the
   same time, and each of you controls a single agent (``env.agents`` holds your
-  agent alone).  The world only advances once every connected participant has
-  sent its action, or once the step timeout of the server has expired: an agent
-  that thinks for too long simply does nothing during that step.
+  agent alone).  The world has its own clock: a step is played at the end of
+  each window of the step timeout of the server, or as soon as every connected
+  participant has sent its action.  An agent that thinks for too long simply
+  does nothing during that step (``infos[agent]["shared_world"]`` tells whether
+  its action was played).
 
 Usage
 -----

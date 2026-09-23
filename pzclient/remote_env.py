@@ -92,7 +92,9 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
       after the participant: `possible_agents` holds that single agent, `reset`
       connects it to the shared world and `close` disconnects it.  The
       participants come and go at any moment of an eternal episode, so
-      ``while env.agents:`` never ends: bound the loop of your agent.
+      ``while env.agents:`` never ends: bound the loop of your agent.  The
+      world plays its steps on its own clock, and ``infos[agent]
+      ["shared_world"]`` tells whether your action was played (see `step`).
 
     Parameters
     ----------
@@ -164,6 +166,12 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
 
         # No agent is acting before the first reset
         self.agents: list[str] = []
+
+        # The step the next actions are meant for, as numbered by the server
+        # in the contest mode (``None`` in the training mode, or before the
+        # first reset): it is sent with the actions, so that the server ignores
+        # them if the world has moved on in the meantime
+        self._step: int | None = None
 
         description = self._request("GET", "/env")
 
@@ -258,6 +266,7 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
         )
 
         self.agents = response["agents"]
+        self._step = response.get("step")
 
         return (
             serialization.decode_value(response["observations"]),
@@ -276,10 +285,16 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
         """
         Play one parallel step with exactly one action per acting agent.
 
-        In the contest mode, the call returns once the shared world has played
-        the step, which happens as soon as every connected participant has sent
-        its action, and at the latest once the step timeout of the server has
-        expired (an agent that answers too late does nothing during that step).
+        In the contest mode, the shared world plays its steps on its own clock:
+        the call returns once the world has played the step, which happens as
+        soon as every connected participant has sent its action, and at the
+        latest once the step timeout of the server has expired (an agent that
+        answers too late does nothing during that step).  An action that
+        arrives after its step has been played is ignored: the call then
+        returns at once, with the latest observation of your agent.
+        ``infos[agent]["shared_world"]`` tells what became of the action:
+        ``action_applied`` (whether it was played), ``message`` (why it was
+        not) and ``step`` (the number of the next step of the world).
 
         Parameters
         ----------
@@ -304,10 +319,11 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
         response = self._request(
             "POST",
             "/step",
-            json={"actions": serialization.encode_value(actions)},
+            json={"actions": serialization.encode_value(actions), "step": self._step},
         )
 
         self.agents = response["agents"]
+        self._step = response.get("step")
 
         return (
             serialization.decode_value(response["observations"]),

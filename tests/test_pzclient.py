@@ -86,6 +86,9 @@ class FakeSession:
     ----------
     status_code : int
         The status the endpoints answer, to test the error handling.
+    shared : bool
+        Whether to answer like a server in the contest mode, which numbers its
+        steps in the responses of ``/reset`` and ``/step``.
 
     Attributes
     ----------
@@ -97,8 +100,9 @@ class FakeSession:
         Whether the session has been closed.
     """
 
-    def __init__(self, status_code=200):
+    def __init__(self, status_code=200, shared=True):
         self.status_code = status_code
+        self.shared = shared
         self.requests = []
         self.headers = {}
         self.closed = False
@@ -135,6 +139,7 @@ class FakeSession:
                     "agents": [AGENT],
                     "observations": {AGENT: serialization.encode_array(self.observe())},
                     "infos": {AGENT: {"died": False}},
+                    "step": self.t if self.shared else None,
                 }
             )
 
@@ -148,6 +153,7 @@ class FakeSession:
                     "terminations": {AGENT: False},
                     "truncations": {AGENT: False},
                     "infos": {AGENT: {"died": True}},
+                    "step": self.t if self.shared else None,
                 }
             )
 
@@ -326,6 +332,30 @@ def test_step_plays_the_actions_of_the_agents(env, session):
     assert terminations == {AGENT: False}
     assert truncations == {AGENT: False}
     assert infos == {AGENT: {"died": True}}
+
+
+def test_each_action_names_the_step_it_is_meant_for(env, session):
+    """The actions carry the step announced by the previous response."""
+    env.reset()
+
+    for expected_step in (0, 1, 2):
+        env.step({AGENT: env.action_space(AGENT).sample()})
+        _, _, body = session.requests[-1]
+        assert body["step"] == expected_step
+
+
+def test_a_training_server_gets_no_step():
+    """A server that does not number its steps gets no step with the actions."""
+    session = FakeSession(shared=False)
+    env = pzclient.RemoteParallelEnv(
+        api_url="http://server/api", token=TOKEN, session=session
+    )
+
+    env.reset()
+    env.step({AGENT: env.action_space(AGENT).sample()})
+
+    _, _, body = session.requests[-1]
+    assert body["step"] is None
 
 
 def test_the_observations_follow_the_steps(env):

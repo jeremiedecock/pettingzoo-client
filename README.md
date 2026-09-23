@@ -107,11 +107,15 @@ points, and your agent has to be written accordingly:
   connects a brand new bug of yours to the running world (it does *not* reset the world, and its
   `seed` and `options` arguments are ignored), and `close()` disconnects it. The participants join
   and leave at any moment, so the number of bugs around you changes while you play.
-- **The world waits for you, but not forever.** A step is played once every connected participant
-  has sent its action: `step()` blocks until then, which is why the HTTP timeout of the client
-  (60 s by default) is much larger than the step timeout of the server. An agent that answers too
-  late simply does nothing during that step, and an agent that stops answering is eventually
-  disconnected from the world.
+- **The world has its own clock.** Time is cut into windows of a few seconds (the step timeout of
+  the server): a step is played at the end of each window, or as soon as every connected
+  participant has sent its action, and `step()` blocks until then. An agent that has not answered
+  in time simply does nothing during that step, and the world goes on without it. An action that
+  arrives after its step has been played is ignored (`step()` then returns at once, with the
+  latest observation of your agent), and an agent that stops answering is eventually disconnected
+  from the world. `infos[agent]["shared_world"]` tells what became of your action:
+  `action_applied` (whether it was played), `message` (why it was not) and `step` (the number of
+  the next step of the world).
 
 ## Development
 
