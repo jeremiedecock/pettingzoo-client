@@ -143,6 +143,13 @@ env.close()
 - Do not run two programs with the same token: they would drive the same world, and interfere with
   each other.
 
+To **watch your world**, pass `render_mode="human"` to `pettingzoo.make`: a window shows the world
+after every `reset()` and `step()` (install pygame first: `pip install pygame`). The window can be
+resized, and closing it stops the rendering while your bugs keep playing. Drawing the world takes
+the server a while, so this slows your loop down: keep it for watching, not for training. In a
+notebook, keep the default `render_mode="rgb_array"` and show `env.render()`, a numpy image, e.g.
+with `plt.imshow(env.render())`.
+
 ### Contest mode
 
 In the contest mode, all the participants play **the same world at the same time**, and you

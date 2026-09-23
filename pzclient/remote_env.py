@@ -33,6 +33,12 @@ The mapping between the parallel API and the endpoints of the server is:
 ``state``                        ``GET /state``
 ``close``                        ``POST /close``
 ===============================  ==========================
+
+The server always renders the environment as PNG images; ``render_mode`` only
+chooses what the client does with them: ``"rgb_array"`` (the default) returns
+them as numpy frames, e.g. to show them in a notebook, and ``"human"`` shows
+them in a pygame window (c.f. `pzclient.viewer`), refreshed after every
+`reset` and `step`.
 """
 
 import io
@@ -46,7 +52,7 @@ import pettingzoo
 from PIL import Image
 import requests
 
-from pzclient import serialization
+from pzclient import serialization, viewer
 from pzclient.exceptions import (
     AgentNotConnectedError,
     AuthenticationError,
@@ -74,6 +80,10 @@ DEFAULT_TIMEOUT = 60.0
 # The id of the "alife" environment of the contest, in the registry of the
 # server (`alife_parallel_env` refuses to play anything else)
 ALIFE_ENV_ID = "alife/alife-v1"
+
+# The render modes of the client: the server always sends PNG images, which are
+# either returned as numpy frames or shown in a window
+RENDER_MODES = ("human", "rgb_array")
 
 
 class RemoteParallelEnv(pettingzoo.ParallelEnv):
@@ -115,6 +125,12 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
         constructor fails if the server serves another one.
     session : requests.Session, optional
         The HTTP session to use; a new one is created by default.
+    render_mode : str or None
+        ``"rgb_array"`` to get the frames of `render` as numpy arrays,
+        ``"human"`` to show them in a pygame window refreshed after every
+        `reset` and `step` (pygame must be installed), ``None`` to disable
+        rendering.  It is ``None`` whatever is asked if the server does not
+        render the environment.
 
     Attributes
     ----------
@@ -128,7 +144,7 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
     metadata : dict
         The metadata of the remote environment.
     render_mode : str or None
-        The render mode of the remote environment.
+        The render mode of the environment (see the `render_mode` parameter).
     observation_spaces : dict
         The observation space of each agent of `possible_agents`.
     action_spaces : dict
@@ -136,6 +152,10 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
 
     Raises
     ------
+    ValueError
+        If `render_mode` is not one of `RENDER_MODES` or ``None``.
+    ImportError
+        If `render_mode` is ``"human"`` and pygame is not installed.
     pzclient.AuthenticationError
         If no token is given, or if the server refuses it.
     pzclient.ServerUnreachableError
@@ -151,7 +171,21 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
         timeout: float = DEFAULT_TIMEOUT,
         env_id: str | None = None,
         session: requests.Session | None = None,
+        render_mode: str | None = "rgb_array",
     ):
+        if render_mode is not None and render_mode not in RENDER_MODES:
+            raise ValueError(
+                f"Unknown render mode '{render_mode}', expected one of "
+                f"{RENDER_MODES} or None."
+            )
+
+        if render_mode == "human":
+            # Fail now rather than at the first frame if pygame is missing
+            viewer.import_pygame()
+
+        # The window of the "human" render mode, opened by the first frame
+        self._viewer: viewer.Viewer | None = None
+
         self.api_url = (
             api_url or os.getenv("PETTINGZOO_API_URL") or DEFAULT_API_URL
         ).rstrip("/")
@@ -190,7 +224,16 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
             )
 
         self.metadata: dict[str, Any] = description["metadata"]
-        self.render_mode: str | None = description["render_mode"]
+        # The server does not render the environment: there is nothing to show
+        if description["render_mode"] is None:
+            if render_mode == "human":
+                logger.warning(
+                    f"The server at {self.api_url} does not render "
+                    f"'{self.env_id}': the 'human' render mode is disabled."
+                )
+            render_mode = None
+
+        self.render_mode: str | None = render_mode
         self.possible_agents: list[str] = description["possible_agents"]
 
         self.observation_spaces: dict[str, spaces.Space] = {
@@ -277,6 +320,9 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
         self.agents = response["agents"]
         self._step = response.get("step")
 
+        if self.render_mode == "human":
+            self.render()
+
         return (
             serialization.decode_value(response["observations"]),
             serialization.decode_value(response["infos"]),
@@ -337,6 +383,9 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
         self.agents = response["agents"]
         self._step = response.get("step")
 
+        if self.render_mode == "human":
+            self.render()
+
         return (
             serialization.decode_value(response["observations"]),
             response["rewards"],
@@ -351,12 +400,18 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
 
         In the contest mode, this is a picture of the whole shared world.
 
+        In the ``"human"`` render mode, the frame is shown in a pygame window,
+        opened by the first frame, and nothing is returned.  Closing that
+        window stops the rendering (`render_mode` becomes ``None``) while the
+        agents keep playing; set `render_mode` back to ``"human"`` to reopen it.
+
         Returns
         -------
         numpy.ndarray or None
-            The ``(H, W, 3)`` uint8 frame of the current state, as
-            ``render_mode="rgb_array"`` does locally, or ``None`` if the
-            environment does not render anything.
+            The ``(H, W, 3)`` uint8 frame of the current state in the
+            ``"rgb_array"`` render mode, as it does locally; ``None`` in the
+            ``"human"`` render mode, or if the environment does not render
+            anything.
 
         Raises
         ------
@@ -368,6 +423,16 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
         content = self.render_png()
 
         if content is None:
+            return None
+
+        if self.render_mode == "human":
+            if self._viewer is None:
+                self._viewer = viewer.Viewer(f"{self.env_id} on {self.api_url}")
+
+            if not self._viewer.show(content):
+                logger.info("The render window was closed: rendering stopped.")
+                self.render_mode = None
+
             return None
 
         # `np.array` rather than `np.asarray`, which would return a read-only
@@ -400,7 +465,8 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
 
         In the contest mode, the agent of the participant leaves the shared
         world, which keeps living for the other participants; calling `reset`
-        connects a new agent to it.
+        connects a new agent to it.  The window of the ``"human"`` render mode
+        is closed.
         """
         try:
             self._request("POST", "/close")
@@ -409,6 +475,9 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
         finally:
             self.agents = []
             self._session.close()
+
+            if self._viewer is not None:
+                self._viewer.close()
 
     ###########################################################################
     # EXTRAS ##################################################################

@@ -90,6 +90,9 @@ class FakeSession:
     shared : bool
         Whether to answer like a server in the contest mode, which numbers its
         steps in the responses of ``/reset`` and ``/step``.
+    render_mode : str or None
+        The render mode of the served environment, ``None`` for a server that
+        does not render it.
 
     Attributes
     ----------
@@ -101,9 +104,10 @@ class FakeSession:
         Whether the session has been closed.
     """
 
-    def __init__(self, status_code=200, shared=True):
+    def __init__(self, status_code=200, shared=True, render_mode="rgb_array"):
         self.status_code = status_code
         self.shared = shared
+        self.render_mode = render_mode
         self.requests = []
         self.headers = {}
         self.closed = False
@@ -122,7 +126,7 @@ class FakeSession:
                 {
                     "env_id": ENV_ID,
                     "metadata": {"name": "alife-v1", "render_fps": 10},
-                    "render_mode": "rgb_array",
+                    "render_mode": self.render_mode,
                     "possible_agents": [AGENT],
                     "max_num_agents": 1,
                     "observation_spaces": {AGENT: encode_space(OBSERVATION_SPACE)},
@@ -420,6 +424,115 @@ def test_render_asks_for_nothing_when_the_environment_does_not_render(env, sessi
     assert env.render() is None
     assert env.render_png() is None
     assert ("GET", "/render", None) not in session.requests
+
+
+def test_nothing_is_rendered_when_the_server_does_not_render():
+    session = FakeSession(render_mode=None)
+
+    env = pzclient.RemoteParallelEnv(
+        api_url="http://server/api", token=TOKEN, session=session, render_mode="human"
+    )
+
+    assert env.render_mode is None
+    assert env.render() is None
+
+
+def test_an_unknown_render_mode_is_refused(session):
+    with pytest.raises(ValueError):
+        pzclient.RemoteParallelEnv(
+            api_url="http://server/api", token=TOKEN, session=session, render_mode="ansi"
+        )
+
+    # Refused before anything is asked to the server
+    assert session.requests == []
+
+
+###############################################################################
+# THE "HUMAN" RENDER MODE #####################################################
+###############################################################################
+
+
+@pytest.fixture
+def pygame(monkeypatch):
+    """Return pygame, drawing off-screen so that the tests need no display."""
+    pygame = pytest.importorskip("pygame")
+    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
+
+    yield pygame
+
+    pygame.display.quit()
+
+
+@pytest.fixture
+def human_env(session, pygame):
+    """Return an environment rendered in a window, bound to the stand-in of the server."""
+    return pzclient.RemoteParallelEnv(
+        api_url="http://server/api", token=TOKEN, session=session, render_mode="human"
+    )
+
+
+def render_requests(session):
+    """Return the number of frames the client asked the server for."""
+    return session.requests.count(("GET", "/render", None))
+
+
+def test_the_window_shows_every_reset_and_every_step(human_env, session, pygame):
+    human_env.reset()
+    assert render_requests(session) == 1
+
+    human_env.step({AGENT: human_env.action_space(AGENT).sample()})
+    assert render_requests(session) == 2
+
+    # The window opens at the size of the frame, 3 pixels wide and 2 high
+    window = pygame.display.get_surface()
+    assert window.get_size() == (3, 2)
+    # The stand-in of the server draws the date of the step
+    assert tuple(window.get_at((0, 0)))[:3] == (1, 1, 1)
+
+
+def test_render_shows_the_frame_and_returns_nothing(human_env, session, pygame):
+    assert human_env.render() is None
+
+    assert render_requests(session) == 1
+    assert pygame.display.get_surface() is not None
+
+
+def test_the_frames_fit_the_resized_window(human_env, pygame):
+    human_env.reset()
+
+    # The user enlarges the window: the frame is scaled, keeping its proportions
+    pygame.display.set_mode((12, 12), pygame.RESIZABLE)
+    human_env.step({AGENT: human_env.action_space(AGENT).sample()})
+
+    window = pygame.display.get_surface()
+    assert tuple(window.get_at((6, 6)))[:3] == (1, 1, 1)
+    # The frame is 12 x 8 pixels, centered: the top rows are background
+    assert tuple(window.get_at((6, 0)))[:3] == (0, 0, 0)
+
+
+def test_closing_the_window_stops_the_rendering(human_env, session, pygame):
+    human_env.reset()
+
+    # The user closes the window
+    pygame.event.post(pygame.event.Event(pygame.QUIT))
+    human_env.step({AGENT: human_env.action_space(AGENT).sample()})
+
+    assert human_env.render_mode is None
+    assert not pygame.display.get_init()
+
+    # The agent keeps playing, and no frame is asked for anymore
+    frames = render_requests(session)
+    human_env.step({AGENT: human_env.action_space(AGENT).sample()})
+    assert render_requests(session) == frames
+
+
+def test_closing_the_environment_closes_the_window(human_env, pygame):
+    human_env.reset()
+    assert pygame.display.get_init()
+
+    human_env.close()
+
+    assert not pygame.display.get_init()
 
 
 def test_state_returns_the_global_state(env):

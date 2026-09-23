@@ -20,7 +20,8 @@ pip install pzclient-0.2.0-py3-none-any.whl
 
 The organizers give you the wheel (or the link to it) together with your token. Python 3.12 or
 later is required; `gymnasium`, `numpy`, `pettingzoo`, `pillow` and `requests` are installed as
-dependencies.
+dependencies. `pygame` is optional: install it (`pip install pygame`) to watch the world in a window
+with `render_mode="human"`.
 
 ## Quick start
 
@@ -84,6 +85,18 @@ These two environment variables are the defaults of the `api_url` and `token` ar
 `action_space(agent)`, `reset(seed, options)`, `step(actions)`, `render()`, `state()` and
 `close()`. It passes `pettingzoo.test.parallel_api_test`, and it is also a context manager, so
 `with pettingzoo.make(...) as env:` closes the environment for you.
+
+The server always draws the world as a PNG image; the `render_mode` argument of `make` chooses what
+the client does with it:
+
+| `render_mode` | Rendering |
+|---|---|
+| `"rgb_array"` (default) | `render()` returns the frame as a `(H, W, 3)` uint8 numpy array, e.g. to show it in a Jupyter notebook. |
+| `"human"` | The frame is shown in a pygame window, refreshed after every `reset()` and `step()`; `render()` returns `None`. The window can be resized, and closing it stops the rendering (`render_mode` becomes `None`) while the agents keep playing. Requires `pygame`. |
+| `None` | Nothing is rendered. |
+
+In the contest mode, the picture of the world is reserved to the organizers: `render()` (and thus
+`reset()` and `step()` with `render_mode="human"`) raises `PermissionDeniedError`.
 
 Two additions are specific to the remote environment:
 
