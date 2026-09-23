@@ -11,12 +11,12 @@ environment. There are a few differences, though, and they are what this tutoria
 
 ## 1. Install and connect
 
-The organizers give you three things: the wheel of `pzclient`, the URL of the server, and your
-**token**. The token identifies you on the server and names your agent in the world: keep it for
-yourself.
+The organizers give you two things: the URL of the server and your **token**. The token
+identifies you on the server and names your agent in the world: keep it for yourself. The library
+itself is installed from the GitHub release of `pzclient` (Python 3.12 or later):
 
 ```sh
-pip install pzclient-0.2.0-py3-none-any.whl   # Python 3.12 or later
+pip install https://github.com/jeremiedecock/pettingzoo-client/releases/download/v0.2.0/pzclient-0.2.0-py3-none-any.whl
 ```
 
 ```python

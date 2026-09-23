@@ -15,10 +15,11 @@ behaves, and how to write an agent that plays it correctly.
 ## Installation
 
 ```sh
-pip install pzclient-0.2.0-py3-none-any.whl
+pip install https://github.com/jeremiedecock/pettingzoo-client/releases/download/v0.2.0/pzclient-0.2.0-py3-none-any.whl
 ```
 
-The organizers give you the wheel (or the link to it) together with your token. Python 3.12 or
+The wheel is attached to the [GitHub releases](https://github.com/jeremiedecock/pettingzoo-client/releases)
+of this repository; the organizers give you the URL of the server and your token. Python 3.12 or
 later is required; `gymnasium`, `numpy`, `pettingzoo`, `pillow` and `requests` are installed as
 dependencies. `pygame` is optional: install it (`pip install pygame`) to watch the world in a window
 with `render_mode="human"` (organizers only, see below).
