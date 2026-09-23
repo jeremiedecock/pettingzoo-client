@@ -112,7 +112,7 @@ same for both, only its loop differs.
 | `step()` | plays the step at once | waits for the world to play the step, on its own clock |
 | Time | stands still until you call `step()` | goes on without you |
 | `close()` | discards your world | disconnects your bug; the world goes on |
-| `state()` | allowed | forbidden (`AuthenticationError`) |
+| `state()` | allowed | forbidden (`PermissionDeniedError`) |
 
 You can tell them apart from `env.possible_agents`: several `agent_<n>` in the training mode, your
 own name alone in the contest mode.
@@ -281,8 +281,9 @@ env.close()
   same world (training).
 - **Render sparingly** in the contest mode: the server draws the picture of the whole world, and the
   world waits while it does. Call `render()` from time to time, not at every step.
-- **Do not lower the HTTP timeout** of the environment (`timeout`, 60 s by default) below `T`: in
-  the contest mode `step()` legitimately waits for up to `T` seconds.
+- **Do not lower the HTTP timeout** of the environment (`timeout`, 60 s by default) below `2T + 1`
+  seconds: in the contest mode `step()` legitimately waits for up to `T` seconds, and for up to
+  `2T + 1` seconds before the server reports that the world could not play the step (503).
 - **Call `close()`** when you stop playing (or use `with pettingzoo.make(...) as env:`), so that
   your bug leaves the world at once instead of braking in the way of the others for a minute.
 
@@ -292,8 +293,9 @@ Everything `pzclient` raises derives from `pzclient.RemoteEnvError`.
 
 | Exception | Cause | What to do |
 |---|---|---|
-| `AuthenticationError` | your token is missing, wrong or revoked; or `state()` in the contest mode | check your token |
+| `AuthenticationError` | your token is missing, wrong or revoked | check your token |
+| `PermissionDeniedError` | your token is valid, but does not grant the request: `state()` in the contest mode | do not call it |
 | `AgentNotConnectedError` | no bug of yours is in the world: not joined yet, disconnected, or the server restarted | call `reset()` |
-| `InvalidActionError` | the actions do not match your agents, or are outside their action space | fix the actions |
+| `InvalidActionError` | the actions do not match your agents, are outside their action space, or cannot be encoded as JSON (a NaN in a plain list) | fix the actions |
 | `ServerUnreachableError` | the network is down, or the server is restarting | wait and retry |
 | `RemoteEnvError` | anything else; with a `status_code` of 502, 503 or 504, the server is restarting or could not play the step in time | wait and retry; tell the organizers if it lasts |

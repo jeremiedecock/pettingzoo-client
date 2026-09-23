@@ -51,6 +51,7 @@ from pzclient.exceptions import (
     AgentNotConnectedError,
     AuthenticationError,
     InvalidActionError,
+    PermissionDeniedError,
     RemoteEnvError,
     ServerUnreachableError,
 )
@@ -58,11 +59,12 @@ from pzclient.exceptions import (
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Base URL of the API of the server, e.g. "http://localhost:8000/api"
-DEFAULT_API_URL = os.getenv("PETTINGZOO_API_URL", "http://localhost:8000/api")
-
-# Token identifying the participant, given by the organizers of the contest
-DEFAULT_TOKEN = os.getenv("PETTINGZOO_TOKEN")
+# Base URL of the API of the server, used when neither the `api_url` argument
+# nor the "PETTINGZOO_API_URL" environment variable is given.  The environment
+# variables ("PETTINGZOO_API_URL" and "PETTINGZOO_TOKEN") are read when the
+# environment is built, not when the module is imported, so that they may be
+# set after `import pzclient` (in a notebook, for instance).
+DEFAULT_API_URL = "http://localhost:8000/api"
 
 # Timeout of the HTTP requests, in seconds.  It must be larger than the step
 # timeout of the server: in the contest mode a step waits for the actions of
@@ -100,7 +102,8 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
     ----------
     api_url : str, optional
         The base URL of the API, e.g. ``"http://localhost:8000/api"``; defaults
-        to the ``PETTINGZOO_API_URL`` environment variable.
+        to the ``PETTINGZOO_API_URL`` environment variable, else to
+        `DEFAULT_API_URL`.
     token : str, optional
         The token identifying the participant, given by the organizers of the
         contest; defaults to the ``PETTINGZOO_TOKEN`` environment variable.
@@ -149,10 +152,12 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
         env_id: str | None = None,
         session: requests.Session | None = None,
     ):
-        self.api_url = (api_url or DEFAULT_API_URL).rstrip("/")
+        self.api_url = (
+            api_url or os.getenv("PETTINGZOO_API_URL") or DEFAULT_API_URL
+        ).rstrip("/")
         self.timeout = timeout
 
-        token = token or DEFAULT_TOKEN
+        token = token or os.getenv("PETTINGZOO_TOKEN")
 
         if not token:
             raise AuthenticationError(
@@ -261,8 +266,12 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
         tuple of dict
             The initial observations and infos of the agents.
         """
+        # The seed and the options may hold numpy objects (``np.int64`` seeds,
+        # for instance), which JSON cannot carry as they are
         response = self._request(
-            "POST", "/reset", json={"seed": seed, "options": options}
+            "POST",
+            "/reset",
+            json=serialization.encode_value({"seed": seed, "options": options}),
         )
 
         self.agents = response["agents"]
@@ -315,6 +324,9 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
         pzclient.InvalidActionError
             If the actions do not match the acting agents or their action
             spaces.
+        pzclient.RemoteEnvError
+            If the shared world did not play the step in due time (HTTP 503,
+            its ``status_code``): try again.
         """
         response = self._request(
             "POST",
@@ -352,7 +364,9 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
         if content is None:
             return None
 
-        return np.asarray(Image.open(io.BytesIO(content)))
+        # `np.array` rather than `np.asarray`, which would return a read-only
+        # view of the pixels of the image
+        return np.array(Image.open(io.BytesIO(content)))
 
     def state(self) -> Any:
         """
@@ -365,6 +379,10 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
 
         Raises
         ------
+        pzclient.PermissionDeniedError
+            In the contest mode, unless the participant is an administrator:
+            the global state reveals what the agents of the other participants
+            sense and do.
         pzclient.RemoteEnvError
             If the remote environment does not implement a global state.
         """
@@ -460,6 +478,8 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
 
         Raises
         ------
+        pzclient.InvalidActionError
+            If the body of the request cannot be encoded as JSON.
         pzclient.ServerUnreachableError
             If the server cannot be reached.
         pzclient.RemoteEnvError
@@ -469,6 +489,13 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
         try:
             response = self._session.request(
                 method, f"{self.api_url}{path}", timeout=self.timeout, **kwargs
+            )
+        except requests.exceptions.InvalidJSONError as error:
+            # Raised while the body is encoded, before anything is sent (JSON
+            # has no NaN, for instance): the request is invalid, like the ones
+            # the server rejects with a 422, and the server is not to blame
+            raise InvalidActionError(
+                f"{method} {path} cannot be encoded as JSON: {error}"
             )
         except requests.RequestException as error:
             raise ServerUnreachableError(
@@ -512,7 +539,7 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
 
         error_classes = {
             401: AuthenticationError,
-            403: AuthenticationError,
+            403: PermissionDeniedError,
             409: AgentNotConnectedError,
             422: InvalidActionError,
         }

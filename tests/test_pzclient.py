@@ -19,6 +19,7 @@ import numpy as np
 import pettingzoo
 from PIL import Image
 import pytest
+import requests
 
 import pzclient
 from pzclient import serialization
@@ -248,6 +249,15 @@ def test_numpy_values_survive_a_round_trip():
     assert decoded["flags"][1:] == [True, "left"]
 
 
+def test_the_decoded_arrays_are_writable():
+    """Like the arrays of a local environment, e.g. to normalize them in place."""
+    array = serialization.decode_value(serialization.encode_value(np.zeros(3)))
+
+    array *= 2.0
+
+    assert array.flags.writeable
+
+
 @pytest.mark.parametrize(
     "space",
     [
@@ -296,11 +306,26 @@ def test_the_token_is_sent_in_the_authorization_header(env, session):
     assert session.headers["Authorization"] == f"Bearer {TOKEN}"
 
 
-def test_the_token_is_required():
+def test_the_token_is_required(monkeypatch):
+    monkeypatch.delenv("PETTINGZOO_TOKEN", raising=False)
+
     with pytest.raises(pzclient.AuthenticationError, match="No token"):
         pzclient.RemoteParallelEnv(
             api_url="http://server/api", token="", session=FakeSession()
         )
+
+
+def test_the_environment_variables_are_read_when_the_environment_is_built(
+    monkeypatch, session
+):
+    """They may be set after `import pzclient`, in a notebook for instance."""
+    monkeypatch.setenv("PETTINGZOO_API_URL", "http://notebook/api/")
+    monkeypatch.setenv("PETTINGZOO_TOKEN", TOKEN)
+
+    env = pzclient.RemoteParallelEnv(session=session)
+
+    assert env.api_url == "http://notebook/api"
+    assert session.headers["Authorization"] == f"Bearer {TOKEN}"
 
 
 def test_reset_starts_the_episode(env, session):
@@ -311,6 +336,15 @@ def test_reset_starts_the_episode(env, session):
     assert env.num_agents == 1
     assert env.observation_space(AGENT).contains(observations[AGENT])
     assert infos == {AGENT: {"died": False}}
+
+
+def test_reset_accepts_a_numpy_seed(env, session):
+    """JSON cannot carry a numpy integer as it is: it is sent as a plain int."""
+    env.reset(seed=np.int64(7))
+
+    _, _, body = session.requests[-1]
+    assert body["seed"] == 7
+    assert type(body["seed"]) is int
 
 
 def test_step_plays_the_actions_of_the_agents(env, session):
@@ -328,6 +362,7 @@ def test_step_plays_the_actions_of_the_agents(env, session):
 
     assert env.agents == [AGENT]
     assert env.observation_space(AGENT).contains(observations[AGENT])
+    assert observations[AGENT].flags.writeable
     assert rewards == {AGENT: 1.5}
     assert terminations == {AGENT: False}
     assert truncations == {AGENT: False}
@@ -374,6 +409,7 @@ def test_render_returns_the_frame_of_the_environment(env):
 
     assert frame.shape == (2, 3, 3)
     assert frame.dtype == np.uint8
+    assert frame.flags.writeable
     # The stand-in of the server draws the date of the step
     assert np.all(frame == 1)
 
@@ -425,7 +461,7 @@ def test_the_environment_is_a_context_manager(session):
     "status_code, error_class",
     [
         (401, pzclient.AuthenticationError),
-        (403, pzclient.AuthenticationError),
+        (403, pzclient.PermissionDeniedError),
         (409, pzclient.AgentNotConnectedError),
         (422, pzclient.InvalidActionError),
         (500, pzclient.RemoteEnvError),
@@ -450,6 +486,18 @@ def test_an_unreachable_server_is_reported():
         pzclient.RemoteParallelEnv(
             api_url="http://localhost:9/api", token=TOKEN, timeout=1.0
         )
+
+
+def test_an_action_that_cannot_be_encoded_is_invalid(env):
+    """A NaN in a plain list is refused before being sent, not blamed on the network."""
+    env.reset()
+
+    # A real session: `requests` fails to encode the body before connecting
+    # to the (nonexistent) server
+    env._session = requests.Session()
+
+    with pytest.raises(pzclient.InvalidActionError, match="cannot be encoded"):
+        env.step({AGENT: [float("nan"), 0.0]})
 
 
 ###############################################################################

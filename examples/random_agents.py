@@ -104,7 +104,8 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument("--api-url", "-u", default=None,
                         help="base URL of the API of the contest server "
-                             f"(default: {pzclient.DEFAULT_API_URL})")
+                             "(default: the PETTINGZOO_API_URL variable, else "
+                             f"{pzclient.DEFAULT_API_URL})")
     parser.add_argument("--token", "-t", default=None,
                         help="the token given to you by the organizers "
                              "(default: the PETTINGZOO_TOKEN variable)")

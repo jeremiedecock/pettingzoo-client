@@ -1,7 +1,7 @@
 # Build the `pzclient` wheel and publish it as a GitHub Release asset, so that
 # it can be installed with pip directly from this repository, e.g.:
 #
-#   pip install https://github.com/jeremiedecock/pettingzoo-client/releases/download/v0.1.0/pzclient-0.1.0-py3-none-any.whl
+#   pip install https://github.com/jeremiedecock/pettingzoo-client/releases/download/v0.2.0/pzclient-0.2.0-py3-none-any.whl
 #
 # The release is created from the pushed tag; remember to bump `version` in
 # pyproject.toml before tagging.

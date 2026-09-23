@@ -57,12 +57,13 @@ def decode_array(payload: dict[str, Any]) -> np.ndarray:
     Returns
     -------
     numpy.ndarray
-        The decoded array.
+        The decoded array, writable like the arrays of a local environment.
     """
     buffer = base64.b64decode(payload[NDARRAY_TAG])
     array = np.frombuffer(buffer, dtype=np.dtype(payload["dtype"]))
 
-    return array.reshape(payload["shape"])
+    # `frombuffer` returns a read-only view of the (immutable) decoded bytes
+    return array.reshape(payload["shape"]).copy()
 
 
 def encode_value(value: Any) -> Any:

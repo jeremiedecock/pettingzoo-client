@@ -25,7 +25,16 @@ class RemoteEnvError(Exception):
 
 
 class AuthenticationError(RemoteEnvError):
-    """The token is missing, unknown or refused by the server (HTTP 401/403)."""
+    """The token is missing, unknown or refused by the server (HTTP 401)."""
+
+
+class PermissionDeniedError(RemoteEnvError):
+    """
+    The token is valid, but does not grant this request (HTTP 403).
+
+    In the contest mode, this is raised by `state`: the global state of the
+    shared world is reserved to the administrators.
+    """
 
 
 class AgentNotConnectedError(RemoteEnvError):
@@ -39,7 +48,12 @@ class AgentNotConnectedError(RemoteEnvError):
 
 
 class InvalidActionError(RemoteEnvError):
-    """The actions do not match the acting agents or their action spaces (HTTP 422)."""
+    """
+    The actions do not match the acting agents or their action spaces (HTTP 422).
+
+    This is also raised, without any request being sent, when the request
+    cannot be encoded as JSON (a NaN in a plain list, for instance).
+    """
 
 
 class ServerUnreachableError(RemoteEnvError):

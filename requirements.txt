@@ -5,6 +5,6 @@
 
 gymnasium     # The spaces of the observations and of the actions
 numpy         # Observations, actions and states are numpy objects
-pettingzoo    # The parallel API and the registry of the environments
+pettingzoo>=1.27.0  # The parallel API and the registry of the environments (added in 1.27.0)
 pillow        # Decodes the PNG frames returned by the "/render" endpoint
 requests      # HTTP client (https://requests.readthedocs.io/en/latest/)

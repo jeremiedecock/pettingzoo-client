@@ -13,7 +13,7 @@ registers the remote environments in the PettingZoo registry, so that the usual
     >>> env = pettingzoo.make(                      # doctest: +SKIP
     ...     "parallel",
     ...     "alife/alife-remote-v1",
-    ...     api_url="https://https://csc53439ep.jdhp.org/api",
+    ...     api_url="https://csc53439ep.jdhp.org/api",
     ...     token="<YOUR_SECRET_TOKEN>",
     ... )
 
@@ -49,6 +49,7 @@ from pzclient.exceptions import (
     AgentNotConnectedError,
     AuthenticationError,
     InvalidActionError,
+    PermissionDeniedError,
     RemoteEnvError,
     ServerUnreachableError,
 )
@@ -99,6 +100,7 @@ __all__ = [
     "AgentNotConnectedError",
     "AuthenticationError",
     "InvalidActionError",
+    "PermissionDeniedError",
     "RemoteEnvError",
     "RemoteParallelEnv",
     "ServerUnreachableError",

@@ -15,7 +15,7 @@ behaves, and how to write an agent that plays it correctly.
 ## Installation
 
 ```sh
-pip install pzclient-0.1.0-py3-none-any.whl
+pip install pzclient-0.2.0-py3-none-any.whl
 ```
 
 The organizers give you the wheel (or the link to it) together with your token. Python 3.12 or
@@ -93,7 +93,8 @@ Two additions are specific to the remote environment:
 | `remote_agents()` | Reads `agents` from the server instead of using the local copy, handy after a network error. |
 
 Everything the library raises derives from `pzclient.RemoteEnvError`:
-`AuthenticationError` (your token is missing or refused), `AgentNotConnectedError` (no agent of
+`AuthenticationError` (your token is missing or refused), `PermissionDeniedError` (your token does
+not grant the request, e.g. `state()` in the contest mode), `AgentNotConnectedError` (no agent of
 yours is acting: call `reset()`), `InvalidActionError` (the actions do not match the acting agents
 or their spaces) and `ServerUnreachableError` (the server could not be reached).
 
