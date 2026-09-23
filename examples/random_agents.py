@@ -48,6 +48,10 @@ Usage
 ``PETTINGZOO_API_URL`` and ``PETTINGZOO_TOKEN`` are the environment variable
 equivalents of ``--api-url`` and ``--token``.  Use the URL and the token given
 to you by the organizers of the contest.
+
+``--render-mode human`` shows the world in a window refreshed at every step
+(pygame must be installed).  In the contest mode, the picture of the world is
+reserved to the organizers.
 """
 
 import argparse
@@ -118,10 +122,22 @@ def parse_args() -> argparse.Namespace:
                         help="directory where the rendered frames of the world "
                              "are saved as PNG images (in the contest mode, "
                              "with an organizer token only)")
+    parser.add_argument("--render-mode", "-r", default="rgb_array",
+                        choices=["human", "rgb_array", "none"],
+                        help="'human' to watch the world in a window refreshed "
+                             "at every step (needs pygame), 'rgb_array' to "
+                             "render only the frames of --frames-dir, 'none' "
+                             "to render nothing (default: rgb_array); in the "
+                             "contest mode, with an organizer token only")
     parser.add_argument("--quiet", "-q", action="store_true",
                         help="only print the summary of the episode")
 
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    if args.render_mode == "none" and args.frames_dir is not None:
+        parser.error("--frames-dir needs a render mode, not 'none'")
+
+    return args
 
 
 def main() -> int:
@@ -140,10 +156,18 @@ def main() -> int:
     # of the participant have to be given.
     try:
         env = pettingzoo.make(
-            "parallel", ENV_ID, api_url=args.api_url, token=args.token
+            "parallel",
+            ENV_ID,
+            api_url=args.api_url,
+            token=args.token,
+            render_mode=None if args.render_mode == "none" else args.render_mode,
         )
     except pzclient.RemoteEnvError as error:
         print(f"Cannot connect to the environment: {error}", file=sys.stderr)
+        return 1
+    except ImportError as error:
+        # The "human" render mode needs pygame, an optional dependency
+        print(error, file=sys.stderr)
         return 1
 
     print(f"Environment: {env.env_id} on {env.api_url}")
