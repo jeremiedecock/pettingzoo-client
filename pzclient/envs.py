@@ -13,7 +13,7 @@ Importing `pzclient` registers the environments served by
     import pettingzoo
     import pzclient
 
-    env = pettingzoo.make("parallel", "alife/alife-remote-v1", token="token_abc123")
+    env = pettingzoo.make("parallel", "alife/alife-remote-v1", token="<YOUR_SECRET_TOKEN>")
 
 The entry points are declared as ``"module:factory"`` strings rather than as
 callables, so that nothing is imported until an environment is actually

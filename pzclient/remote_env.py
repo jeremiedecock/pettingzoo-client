@@ -10,7 +10,7 @@ participant), it is used exactly like a local PettingZoo environment::
     import pettingzoo
     import pzclient  # registers the remote environments
 
-    env = pettingzoo.make("parallel", "alife/alife-remote-v1", token="token_abc123")
+    env = pettingzoo.make("parallel", "alife/alife-remote-v1", token="<YOUR_SECRET_TOKEN>")
 
     observations, infos = env.reset()
 

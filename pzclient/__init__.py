@@ -13,8 +13,8 @@ registers the remote environments in the PettingZoo registry, so that the usual
     >>> env = pettingzoo.make(                      # doctest: +SKIP
     ...     "parallel",
     ...     "alife/alife-remote-v1",
-    ...     api_url="http://localhost:8000/api",
-    ...     token="token_abc123",
+    ...     api_url="https://https://csc53439ep.jdhp.org/api",
+    ...     token="<YOUR_SECRET_TOKEN>",
     ... )
 
 `pzclient.RemoteParallelEnv` may also be instantiated directly, which is the
