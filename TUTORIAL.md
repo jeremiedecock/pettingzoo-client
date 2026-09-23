@@ -112,7 +112,8 @@ same for both, only its loop differs.
 | `step()` | plays the step at once | waits for the world to play the step, on its own clock |
 | Time | stands still until you call `step()` | goes on without you |
 | `close()` | discards your world | disconnects your bug; the world goes on |
-| `render()`, `state()` | allowed | forbidden (`PermissionDeniedError`) |
+| `state()` | allowed | forbidden (`PermissionDeniedError`) |
+| `render()` | forbidden (`PermissionDeniedError`) | forbidden (`PermissionDeniedError`) |
 
 You can tell them apart from `env.possible_agents`: several `agent_<n>` in the training mode, your
 own name alone in the contest mode.
@@ -143,12 +144,9 @@ env.close()
 - Do not run two programs with the same token: they would drive the same world, and interfere with
   each other.
 
-To **watch your world**, pass `render_mode="human"` to `pettingzoo.make`: a window shows the world
-after every `reset()` and `step()` (install pygame first: `pip install pygame`). The window can be
-resized, and closing it stops the rendering while your bugs keep playing. Drawing the world takes
-the server a while, so this slows your loop down: keep it for watching, not for training. In a
-notebook, keep the default `render_mode="rgb_array"` and show `env.render()`, a numpy image, e.g.
-with `plt.imshow(env.render())`.
+**Rendering is reserved to the organizers**, in the training mode as in the contest mode:
+`render()`, and `render_mode="human"`, raise `pzclient.PermissionDeniedError` with your token. Your
+bugs only know the world through their observations, and so does your agent.
 
 ### Contest mode
 
@@ -301,7 +299,7 @@ Everything `pzclient` raises derives from `pzclient.RemoteEnvError`.
 | Exception | Cause | What to do |
 |---|---|---|
 | `AuthenticationError` | your token is missing, wrong or revoked | check your token |
-| `PermissionDeniedError` | your token is valid, but does not grant the request: `render()` or `state()` in the contest mode | do not call them |
+| `PermissionDeniedError` | your token is valid, but does not grant the request: `render()`, or `state()` in the contest mode | do not call them |
 | `AgentNotConnectedError` | no bug of yours is in the world: not joined yet, disconnected, or the server restarted | call `reset()` |
 | `InvalidActionError` | the actions do not match your agents, are outside their action space, or cannot be encoded as JSON (a NaN in a plain list) | fix the actions |
 | `ServerUnreachableError` | the network is down, or the server is restarting | wait and retry |

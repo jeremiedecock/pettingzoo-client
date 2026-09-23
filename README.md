@@ -21,7 +21,7 @@ pip install pzclient-0.2.0-py3-none-any.whl
 The organizers give you the wheel (or the link to it) together with your token. Python 3.12 or
 later is required; `gymnasium`, `numpy`, `pettingzoo`, `pillow` and `requests` are installed as
 dependencies. `pygame` is optional: install it (`pip install pygame`) to watch the world in a window
-with `render_mode="human"`.
+with `render_mode="human"` (organizers only, see below).
 
 ## Quick start
 
@@ -95,8 +95,9 @@ the client does with it:
 | `"human"` | The frame is shown in a pygame window, refreshed after every `reset()` and `step()`; `render()` returns `None`. The server sends JPEG images, much lighter than the PNG ones of `"rgb_array"`. The window can be resized, and closing it stops the rendering (`render_mode` becomes `None`) while the agents keep playing. Requires `pygame`. |
 | `None` | Nothing is rendered. |
 
-In the contest mode, the picture of the world is reserved to the organizers: `render()` (and thus
-`reset()` and `step()` with `render_mode="human"`) raises `PermissionDeniedError`.
+Rendering is reserved to the organizers, in the training mode as in the contest mode: for a
+participant, `render()` (and thus `reset()` and `step()` with `render_mode="human"`) raises
+`PermissionDeniedError`.
 
 Two additions are specific to the remote environment:
 

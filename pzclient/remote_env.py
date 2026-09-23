@@ -132,7 +132,8 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
         ``"human"`` to show them in a pygame window refreshed after every
         `reset` and `step` (pygame must be installed), ``None`` to disable
         rendering.  It is ``None`` whatever is asked if the server does not
-        render the environment.
+        render the environment.  Rendering is reserved to the organizers: for
+        a participant, `render` raises `pzclient.PermissionDeniedError`.
 
     Attributes
     ----------
@@ -418,9 +419,10 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
         Raises
         ------
         pzclient.PermissionDeniedError
-            In the contest mode, unless the participant is an administrator:
-            the picture of the world reveals where the agents of the other
-            participants are and what they do.
+            Unless the participant is an administrator: rendering is reserved
+            to the organizers, in the training mode as in the contest mode
+            (where the picture of the world reveals where the agents of the
+            other participants are and what they do).
         """
         if self.render_mode == "human":
             content = self._render_image("jpeg")
@@ -504,8 +506,7 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
         Raises
         ------
         pzclient.PermissionDeniedError
-            In the contest mode, unless the participant is an administrator
-            (see `render`).
+            Unless the participant is an administrator (see `render`).
         """
         return self._render_image("png")
 

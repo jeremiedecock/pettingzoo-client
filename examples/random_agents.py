@@ -50,8 +50,8 @@ equivalents of ``--api-url`` and ``--token``.  Use the URL and the token given
 to you by the organizers of the contest.
 
 ``--render-mode human`` shows the world in a window refreshed at every step
-(pygame must be installed).  In the contest mode, the picture of the world is
-reserved to the organizers.
+(pygame must be installed).  Rendering is reserved to the organizers, in the
+training mode as in the contest mode.
 """
 
 import argparse
@@ -120,15 +120,15 @@ def parse_args() -> argparse.Namespace:
                         help="seed of the random policy, to make it reproducible")
     parser.add_argument("--frames-dir", "-f", type=pathlib.Path, default=None,
                         help="directory where the rendered frames of the world "
-                             "are saved as PNG images (in the contest mode, "
-                             "with an organizer token only)")
+                             "are saved as PNG images (with an organizer "
+                             "token only)")
     parser.add_argument("--render-mode", "-r", default="rgb_array",
                         choices=["human", "rgb_array", "none"],
                         help="'human' to watch the world in a window refreshed "
                              "at every step (needs pygame), 'rgb_array' to "
                              "render only the frames of --frames-dir, 'none' "
-                             "to render nothing (default: rgb_array); in the "
-                             "contest mode, with an organizer token only")
+                             "to render nothing (default: rgb_array); "
+                             "'human' needs an organizer token")
     parser.add_argument("--quiet", "-q", action="store_true",
                         help="only print the summary of the episode")
 
@@ -222,8 +222,7 @@ def main() -> int:
                 try:
                     frame = env.render_png()
                 except pzclient.PermissionDeniedError:
-                    # In the contest mode, the picture of the whole world is
-                    # reserved to the organizers
+                    # Rendering is reserved to the organizers
                     print("Your token does not allow rendering the world: "
                           "no frame will be saved.", file=sys.stderr)
                     args.frames_dir = None
