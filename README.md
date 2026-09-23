@@ -92,7 +92,7 @@ the client does with it:
 | `render_mode` | Rendering |
 |---|---|
 | `"rgb_array"` (default) | `render()` returns the frame as a `(H, W, 3)` uint8 numpy array, e.g. to show it in a Jupyter notebook. |
-| `"human"` | The frame is shown in a pygame window, refreshed after every `reset()` and `step()`; `render()` returns `None`. The window can be resized, and closing it stops the rendering (`render_mode` becomes `None`) while the agents keep playing. Requires `pygame`. |
+| `"human"` | The frame is shown in a pygame window, refreshed after every `reset()` and `step()`; `render()` returns `None`. The server sends JPEG images, much lighter than the PNG ones of `"rgb_array"`. The window can be resized, and closing it stops the rendering (`render_mode` becomes `None`) while the agents keep playing. Requires `pygame`. |
 | `None` | Nothing is rendered. |
 
 In the contest mode, the picture of the world is reserved to the organizers: `render()` (and thus

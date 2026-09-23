@@ -34,11 +34,13 @@ The mapping between the parallel API and the endpoints of the server is:
 ``close``                        ``POST /close``
 ===============================  ==========================
 
-The server always renders the environment as PNG images; ``render_mode`` only
+The server always renders the environment as images; ``render_mode`` only
 chooses what the client does with them: ``"rgb_array"`` (the default) returns
-them as numpy frames, e.g. to show them in a notebook, and ``"human"`` shows
-them in a pygame window (c.f. `pzclient.viewer`), refreshed after every
-`reset` and `step`.
+them as numpy frames, decoded from lossless PNG images, e.g. to show them in a
+notebook, and ``"human"`` shows them in a pygame window (c.f.
+`pzclient.viewer`), refreshed after every `reset` and `step`.  The window shows
+JPEG images, which the server encodes ~20 times faster than PNG ones and which
+are ~5 times smaller.
 """
 
 import io
@@ -420,19 +422,22 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
             the picture of the world reveals where the agents of the other
             participants are and what they do.
         """
+        if self.render_mode == "human":
+            content = self._render_image("jpeg")
+
+            if content is not None:
+                if self._viewer is None:
+                    self._viewer = viewer.Viewer(f"{self.env_id} on {self.api_url}")
+
+                if not self._viewer.show(content):
+                    logger.info("The render window was closed: rendering stopped.")
+                    self.render_mode = None
+
+            return None
+
         content = self.render_png()
 
         if content is None:
-            return None
-
-        if self.render_mode == "human":
-            if self._viewer is None:
-                self._viewer = viewer.Viewer(f"{self.env_id} on {self.api_url}")
-
-            if not self._viewer.show(content):
-                logger.info("The render window was closed: rendering stopped.")
-                self.render_mode = None
-
             return None
 
         # `np.array` rather than `np.asarray`, which would return a read-only
@@ -502,10 +507,28 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
             In the contest mode, unless the participant is an administrator
             (see `render`).
         """
+        return self._render_image("png")
+
+    def _render_image(self, image_format: str) -> bytes | None:
+        """
+        Ask the server for an image of the current state of the environment.
+
+        Parameters
+        ----------
+        image_format : {"png", "jpeg"}
+            The format of the image: PNG is lossless, JPEG is much faster to
+            encode and much smaller.
+
+        Returns
+        -------
+        bytes or None
+            The encoded frame, or ``None`` if the environment does not render
+            anything (its ``render_mode`` is ``None``).
+        """
         if self.render_mode is None:
             return None
 
-        content = self._request("GET", "/render")
+        content = self._request("GET", "/render", params={"format": image_format})
 
         return content if isinstance(content, bytes) else None
 

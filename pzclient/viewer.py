@@ -1,8 +1,8 @@
 """
 The window of the ``"human"`` render mode.
 
-`Viewer` shows the PNG frames sent by the ``/render`` endpoint of the server in
-a pygame window, as the local PettingZoo environments do in their ``"human"``
+`Viewer` shows the frames sent by the ``/render`` endpoint of the server (JPEG
+images, much lighter than PNG ones) in a pygame window, as the local PettingZoo environments do in their ``"human"``
 render mode.  pygame is an optional dependency of the library: it is only
 needed by this render mode, and only imported when it is used.
 """
@@ -71,14 +71,14 @@ class Viewer:
         self.is_open = False
         self._pygame = import_pygame()
 
-    def show(self, png: bytes) -> bool:
+    def show(self, image_bytes: bytes) -> bool:
         """
         Show a frame in the window, opening the window if needed.
 
         Parameters
         ----------
-        png : bytes
-            The PNG encoded frame.
+        image_bytes : bytes
+            The encoded frame, in any format pygame reads (PNG, JPEG, ...).
 
         Returns
         -------
@@ -96,7 +96,8 @@ class Viewer:
                     self.close()
                     return False
 
-        image = pygame.image.load(io.BytesIO(png), "frame.png")
+        # pygame recognizes the format of the image from its content
+        image = pygame.image.load(io.BytesIO(image_bytes))
 
         if not self.is_open:
             pygame.display.init()

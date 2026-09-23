@@ -49,14 +49,16 @@ class FakeResponse:
         The JSON body of the response.
     content : bytes, optional
         The raw body of the response, for the binary answers.
+    media_type : str
+        The media type of `content`.
     status_code : int
         The HTTP status of the response.
     """
 
-    def __init__(self, payload=None, content=None, status_code=200):
+    def __init__(self, payload=None, content=None, status_code=200, media_type="image/png"):
         self.status_code = status_code
         self.headers = {
-            "Content-Type": "application/json" if content is None else "image/png"
+            "Content-Type": "application/json" if content is None else media_type
         }
         self.content = json.dumps(payload).encode() if content is None else content
 
@@ -102,18 +104,21 @@ class FakeSession:
         The headers of the session, where the token is expected.
     closed : bool
         Whether the session has been closed.
+    render_formats : list of str
+        The image format of each request of ``/render``.
     """
 
     def __init__(self, status_code=200, shared=True, render_mode="rgb_array"):
         self.status_code = status_code
         self.shared = shared
         self.render_mode = render_mode
+        self.render_formats = []
         self.requests = []
         self.headers = {}
         self.closed = False
         self.t = 0
 
-    def request(self, method, url, timeout=None, json=None):
+    def request(self, method, url, timeout=None, json=None, params=None):
         """Answer a request of the client, as the server would."""
         path = url.split("/api", 1)[1]
         self.requests.append((method, path, json))
@@ -163,10 +168,12 @@ class FakeSession:
             )
 
         if path == "/render":
+            image_format = (params or {}).get("format", "png")
+            self.render_formats.append(image_format)
             image = Image.fromarray(np.full((2, 3, 3), self.t, dtype=np.uint8))
             buffer = io.BytesIO()
-            image.save(buffer, format="PNG")
-            return FakeResponse(content=buffer.getvalue())
+            image.save(buffer, format=image_format.upper())
+            return FakeResponse(content=buffer.getvalue(), media_type=f"image/{image_format}")
 
         if path == "/state":
             return FakeResponse(
@@ -405,12 +412,14 @@ def test_the_observations_follow_the_steps(env):
     assert observations[AGENT][0] == pytest.approx(0.01)
 
 
-def test_render_returns_the_frame_of_the_environment(env):
+def test_render_returns_the_frame_of_the_environment(env, session):
     env.reset()
     env.step({AGENT: env.action_space(AGENT).sample()})
 
     frame = env.render()
 
+    # The frames returned are lossless
+    assert session.render_formats == ["png"]
     assert frame.shape == (2, 3, 3)
     assert frame.dtype == np.uint8
     assert frame.flags.writeable
@@ -482,6 +491,9 @@ def test_the_window_shows_every_reset_and_every_step(human_env, session, pygame)
 
     human_env.step({AGENT: human_env.action_space(AGENT).sample()})
     assert render_requests(session) == 2
+
+    # The window shows the lighter JPEG images
+    assert session.render_formats == ["jpeg", "jpeg"]
 
     # The window opens at the size of the frame, 3 pixels wide and 2 high
     window = pygame.display.get_surface()
