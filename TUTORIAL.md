@@ -112,7 +112,7 @@ same for both, only its loop differs.
 | `step()` | plays the step at once | waits for the world to play the step, on its own clock |
 | Time | stands still until you call `step()` | goes on without you |
 | `close()` | discards your world | disconnects your bug; the world goes on |
-| `state()` | allowed | forbidden (`PermissionDeniedError`) |
+| `render()`, `state()` | allowed | forbidden (`PermissionDeniedError`) |
 
 You can tell them apart from `env.possible_agents`: several `agent_<n>` in the training mode, your
 own name alone in the contest mode.
@@ -153,7 +153,9 @@ number of bugs around you changes while you play.
   world, and its `seed` and `options` arguments are ignored. If you already had a bug, it is
   replaced: you never control two bugs at once.
 - `close()` disconnects your bug. The world goes on for the others, and you may join again later.
-- `render()` returns a picture of the whole world, the same for everybody.
+- `render()` and `state()` are reserved to the organizers: they would show you where the bugs of
+  the others are. They raise `pzclient.PermissionDeniedError`; your bug only knows the world through
+  its observations.
 
 #### The world has its own clock
 
@@ -279,8 +281,6 @@ env.close()
   Google Colab) or simplify it.
 - **One program per token.** Two programs sharing a token fight over the same bug (contest) or the
   same world (training).
-- **Render sparingly** in the contest mode: the server draws the picture of the whole world, and the
-  world waits while it does. Call `render()` from time to time, not at every step.
 - **Do not lower the HTTP timeout** of the environment (`timeout`, 60 s by default) below `2T + 1`
   seconds: in the contest mode `step()` legitimately waits for up to `T` seconds, and for up to
   `2T + 1` seconds before the server reports that the world could not play the step (503).
@@ -294,7 +294,7 @@ Everything `pzclient` raises derives from `pzclient.RemoteEnvError`.
 | Exception | Cause | What to do |
 |---|---|---|
 | `AuthenticationError` | your token is missing, wrong or revoked | check your token |
-| `PermissionDeniedError` | your token is valid, but does not grant the request: `state()` in the contest mode | do not call it |
+| `PermissionDeniedError` | your token is valid, but does not grant the request: `render()` or `state()` in the contest mode | do not call them |
 | `AgentNotConnectedError` | no bug of yours is in the world: not joined yet, disconnected, or the server restarted | call `reset()` |
 | `InvalidActionError` | the actions do not match your agents, are outside their action space, or cannot be encoded as JSON (a NaN in a plain list) | fix the actions |
 | `ServerUnreachableError` | the network is down, or the server is restarting | wait and retry |

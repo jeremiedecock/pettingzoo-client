@@ -349,8 +349,7 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
         """
         Render the current state of the remote environment.
 
-        In the contest mode, this is a picture of the whole shared world: every
-        participant sees the same image.
+        In the contest mode, this is a picture of the whole shared world.
 
         Returns
         -------
@@ -358,6 +357,13 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
             The ``(H, W, 3)`` uint8 frame of the current state, as
             ``render_mode="rgb_array"`` does locally, or ``None`` if the
             environment does not render anything.
+
+        Raises
+        ------
+        pzclient.PermissionDeniedError
+            In the contest mode, unless the participant is an administrator:
+            the picture of the world reveals where the agents of the other
+            participants are and what they do.
         """
         content = self.render_png()
 
@@ -420,6 +426,12 @@ class RemoteParallelEnv(pettingzoo.ParallelEnv):
         bytes or None
             The PNG encoded frame, or ``None`` if the environment does not
             render anything (its ``render_mode`` is ``None``).
+
+        Raises
+        ------
+        pzclient.PermissionDeniedError
+            In the contest mode, unless the participant is an administrator
+            (see `render`).
         """
         if self.render_mode is None:
             return None

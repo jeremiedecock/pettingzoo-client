@@ -116,7 +116,8 @@ def parse_args() -> argparse.Namespace:
                         help="seed of the random policy, to make it reproducible")
     parser.add_argument("--frames-dir", "-f", type=pathlib.Path, default=None,
                         help="directory where the rendered frames of the world "
-                             "are saved as PNG images")
+                             "are saved as PNG images (in the contest mode, "
+                             "with an organizer token only)")
     parser.add_argument("--quiet", "-q", action="store_true",
                         help="only print the summary of the episode")
 
@@ -194,9 +195,17 @@ def main() -> int:
                 print("Some of your agents are done: they left the episode.")
 
             if args.frames_dir is not None:
-                frame = env.render_png()
-                if frame is not None:
-                    (args.frames_dir / f"frame_{step:05d}.png").write_bytes(frame)
+                try:
+                    frame = env.render_png()
+                except pzclient.PermissionDeniedError:
+                    # In the contest mode, the picture of the whole world is
+                    # reserved to the organizers
+                    print("Your token does not allow rendering the world: "
+                          "no frame will be saved.", file=sys.stderr)
+                    args.frames_dir = None
+                else:
+                    if frame is not None:
+                        (args.frames_dir / f"frame_{step:05d}.png").write_bytes(frame)
 
             if not args.quiet:
                 print(f"step {step:>5} | "
