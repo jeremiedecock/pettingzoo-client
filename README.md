@@ -15,7 +15,7 @@ behaves, and how to write an agent that plays it correctly.
 ## Installation
 
 ```sh
-pip install https://github.com/jeremiedecock/pettingzoo-client/releases/download/v0.2.0/pzclient-0.2.0-py3-none-any.whl
+pip install https://github.com/jeremiedecock/pettingzoo-client/releases/download/v0.3.1/pzclient-0.3.1-py3-none-any.whl
 ```
 
 The wheel is attached to the [GitHub releases](https://github.com/jeremiedecock/pettingzoo-client/releases)
@@ -170,8 +170,9 @@ The wheel is not on PyPI: the [`Publish wheel`](.github/workflows/publish-wheel.
 Actions workflow attaches it to a GitHub release every time a `v*` tag is pushed. To publish
 version `X.Y.Z`:
 
-1. Set `version = "X.Y.Z"` in [`pyproject.toml`](pyproject.toml), and update the version in the
-   `pip install` URL of the [installation](#installation) section.
+1. Run `just bump X.Y.Z`: it sets `version = "X.Y.Z"` in [`pyproject.toml`](pyproject.toml) and
+   updates the `pip install` URLs of this README, of the [tutorial](TUTORIAL.md) and of the
+   [examples](examples/).
 2. Commit and push, then tag that commit and push the tag:
 
    ```sh

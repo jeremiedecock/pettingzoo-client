@@ -23,7 +23,7 @@ per mode (see [section 3](#3-training-mode-and-contest-mode)):
 The library itself is installed from the GitHub release of `pzclient` (Python 3.12 or later):
 
 ```sh
-pip install https://github.com/jeremiedecock/pettingzoo-client/releases/download/v0.2.0/pzclient-0.2.0-py3-none-any.whl
+pip install https://github.com/jeremiedecock/pettingzoo-client/releases/download/v0.3.1/pzclient-0.3.1-py3-none-any.whl
 ```
 
 ```python
