@@ -19,10 +19,21 @@ pip install https://github.com/jeremiedecock/pettingzoo-client/releases/download
 ```
 
 The wheel is attached to the [GitHub releases](https://github.com/jeremiedecock/pettingzoo-client/releases)
-of this repository; the organizers give you the URL of the server and your token. Python 3.12 or
-later is required; `gymnasium`, `numpy`, `pettingzoo`, `pillow` and `requests` are installed as
+of this repository; the organizers give you your token. Python 3.12 or later is required; `gymnasium`, `numpy`, `pettingzoo`, `pillow` and `requests` are installed as
 dependencies. `pygame` is optional: install it (`pip install pygame`) to watch the world in a window
 with `render_mode="human"` (organizers only, see below).
+
+## The servers
+
+The organizers run two servers, one per mode; your token works on both:
+
+| Server | URL (`api_url`) | What you get |
+|---|---|---|
+| Training | `https://csc53439ep.jdhp.org/training/api` | a world of your own, where you drive all the bugs, and which only advances when you call `step()` |
+| Contest | `https://csc53439ep.jdhp.org/api` | one bug, named after you, in the world shared by all the participants |
+
+The [tutorial](TUTORIAL.md#3-training-mode-and-contest-mode) explains the differences between the
+two modes.
 
 ## Quick start
 
@@ -33,7 +44,7 @@ import pzclient  # importing the library registers the remote environments
 env = pettingzoo.make(
     "parallel",
     "alife/alife-remote-v1",
-    api_url="http://<the server of the contest>/api",
+    api_url="https://csc53439ep.jdhp.org/training/api",  # the contest: https://csc53439ep.jdhp.org/api
     token="<your token>",
 )
 
@@ -56,7 +67,7 @@ environment without the registry.
 
 ```sh
 python examples/random_agents.py --token <your token> \
-                                 --api-url http://<the server of the contest>/api \
+                                 --api-url https://csc53439ep.jdhp.org/training/api \
                                  --steps 500
 ```
 
@@ -66,11 +77,16 @@ Every participant receives a token from the organizers; it identifies you on the
 your agent in the shared world. Pass it as the `token` argument or export it once:
 
 ```sh
-export PETTINGZOO_API_URL=http://<the server of the contest>/api
+export PETTINGZOO_API_URL=https://csc53439ep.jdhp.org/training/api  # the contest: https://csc53439ep.jdhp.org/api
 export PETTINGZOO_TOKEN=<your token>
 ```
 
 These two environment variables are the defaults of the `api_url` and `token` arguments.
+
+The server knows you by your token alone, not by your program: two programs running with the same
+token on the same server (two scripts, or a script and a notebook) share the same world in the
+training mode and the same bug in the contest mode, and disrupt each other. Run one program per
+token and per server; the [tutorial](TUTORIAL.md#training-mode) details what goes wrong otherwise.
 
 ## The registered environments
 

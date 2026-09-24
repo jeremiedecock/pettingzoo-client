@@ -46,8 +46,12 @@ Usage
                             --steps 500
 
 ``PETTINGZOO_API_URL`` and ``PETTINGZOO_TOKEN`` are the environment variable
-equivalents of ``--api-url`` and ``--token``.  Use the URL and the token given
-to you by the organizers of the contest.
+equivalents of ``--api-url`` and ``--token``.  Use the token given to you by the
+organizers of the contest, and the URL of the server to play on:
+
+- ``https://csc53439ep.jdhp.org/api``, the contest (shared) world;
+- ``https://csc53439ep.jdhp.org/training/api``, a training world of your own,
+  where you drive all the agents.
 
 ``--render-mode human`` shows the world in a window refreshed at every step
 (pygame must be installed).  Rendering is reserved to the organizers, in the

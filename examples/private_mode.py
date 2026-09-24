@@ -10,7 +10,8 @@ environment variables:
     export USER_NAME=<your username>
     python private_mode.py
 
-The "human" render mode needs pygame.
+The "human" render mode needs pygame, and an administrator token: rendering is
+reserved to the organizers, in the training mode as in the contest mode.
 """
 
 import os
@@ -23,7 +24,7 @@ import pzclient  # noqa: F401
 env = pettingzoo.make(
     "parallel",
     "alife/alife-remote-v1",
-    api_url="http://localhost:8000/api",  # the URL of the training server
+    api_url="https://csc53439ep.jdhp.org/training/api",  # the training server
     token=os.environ["USER_TOKEN"],
     render_mode="human",
 )

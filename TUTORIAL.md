@@ -11,9 +11,16 @@ environment. There are a few differences, though, and they are what this tutoria
 
 ## 1. Install and connect
 
-The organizers give you two things: the URL of the server and your **token**. The token
-identifies you on the server and names your agent in the world: keep it for yourself. The library
-itself is installed from the GitHub release of `pzclient` (Python 3.12 or later):
+The organizers give you your **token**. It identifies you on the server and names your agent in
+the world: keep it for yourself. The same token works on the two servers of the organizers, one
+per mode (see [section 3](#3-training-mode-and-contest-mode)):
+
+| Server | URL (`api_url`) |
+|---|---|
+| Training | `https://csc53439ep.jdhp.org/training/api` |
+| Contest | `https://csc53439ep.jdhp.org/api` |
+
+The library itself is installed from the GitHub release of `pzclient` (Python 3.12 or later):
 
 ```sh
 pip install https://github.com/jeremiedecock/pettingzoo-client/releases/download/v0.2.0/pzclient-0.2.0-py3-none-any.whl
@@ -26,7 +33,7 @@ import pzclient  # importing the library registers the remote environments
 env = pettingzoo.make(
     "parallel",
     "alife/alife-remote-v1",
-    api_url="<the URL given by the organizers>",  # e.g. "https://.../api"
+    api_url="https://csc53439ep.jdhp.org/training/api",  # the contest: https://csc53439ep.jdhp.org/api
     token="<your token>",
 )
 
@@ -39,7 +46,7 @@ Instead of passing them each time, you can export the URL and the token once; th
 of `api_url` and `token`:
 
 ```sh
-export PETTINGZOO_API_URL=<the URL given by the organizers>
+export PETTINGZOO_API_URL=https://csc53439ep.jdhp.org/training/api  # the contest: https://csc53439ep.jdhp.org/api
 export PETTINGZOO_TOKEN=<your token>
 ```
 
@@ -101,11 +108,12 @@ Always bound your loops.
 
 ## 3. Training mode and contest mode
 
-The server runs in one of two modes. The organizers tell you which server is which; your code is the
-same for both, only its loop differs.
+The organizers run two servers, one per mode, and your token works on both. Your code is the same
+for both, only its loop differs: to switch from one to the other, change `api_url`.
 
 | | Training mode | Contest mode |
 |---|---|---|
+| `api_url` | `https://csc53439ep.jdhp.org/training/api` | `https://csc53439ep.jdhp.org/api` |
 | Your world | a world of your own, nobody else in it | one world shared by all the participants |
 | Your agents | all the bugs of the world (`agent_0`, `agent_1`, …) | a single bug, named after you |
 | `reset()` | resets your world (`seed` works) | connects a brand new bug of yours to the running world |
@@ -141,8 +149,13 @@ env.close()
   raises `pzclient.InvalidActionError`.
 - `close()` discards your world; the next `reset()` starts a fresh one.
 - Your world lives on the server as long as the server runs: a restart of the server loses it.
-- Do not run two programs with the same token: they would drive the same world, and interfere with
-  each other.
+- Your world belongs to your token, not to your program: the server cannot tell apart two programs
+  using the same token. **Do not run two programs with the same token** (two scripts, or a script
+  and a notebook) on the training server: they drive the same world, and interfere with each other.
+  Their steps interleave, so each program sees the world jump ahead between two of its calls, and
+  receives observations and rewards that the actions of the other program shaped too; a `reset()`
+  of one program resets the world of the other; and the `close()` of the first program to finish
+  discards the world of the other, whose next `step()` raises `pzclient.AgentNotConnectedError`.
 
 **Rendering is reserved to the organizers**, in the training mode as in the contest mode:
 `render()`, and `render_mode="human"`, raise `pzclient.PermissionDeniedError` with your token. Your
@@ -284,8 +297,8 @@ env.close()
   (`time.monotonic()` before and after the call) and keep it well below `T`. Watch
   `action_applied`: if it is often `False`, your agent is too slow; run it on a faster machine (e.g.
   Google Colab) or simplify it.
-- **One program per token.** Two programs sharing a token fight over the same bug (contest) or the
-  same world (training).
+- **One program per token and per server.** Two programs sharing a token on the same server fight
+  over the same bug (contest) or the same world (training); one on each server is fine.
 - **Do not lower the HTTP timeout** of the environment (`timeout`, 60 s by default) below `2T + 1`
   seconds: in the contest mode `step()` legitimately waits for up to `T` seconds, and for up to
   `2T + 1` seconds before the server reports that the world could not play the step (503).
@@ -300,7 +313,7 @@ Everything `pzclient` raises derives from `pzclient.RemoteEnvError`.
 |---|---|---|
 | `AuthenticationError` | your token is missing, wrong or revoked | check your token |
 | `PermissionDeniedError` | your token is valid, but does not grant the request: `render()`, or `state()` in the contest mode | do not call them |
-| `AgentNotConnectedError` | no bug of yours is in the world: not joined yet, disconnected, or the server restarted | call `reset()` |
+| `AgentNotConnectedError` | no bug of yours is in the world: not joined yet, disconnected, the server restarted, or another program using your token called `close()` | call `reset()` (and stop the other program) |
 | `InvalidActionError` | the actions do not match your agents, are outside their action space, or cannot be encoded as JSON (a NaN in a plain list) | fix the actions |
 | `ServerUnreachableError` | the network is down, or the server is restarting | wait and retry |
 | `RemoteEnvError` | anything else; with a `status_code` of 502, 503 or 504, the server is restarting or could not play the step in time | wait and retry; tell the organizers if it lasts |
