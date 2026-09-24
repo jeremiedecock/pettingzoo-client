@@ -29,7 +29,7 @@ The organizers run two servers, one per mode; your token works on both:
 
 | Server | URL (`api_url`) | What you get |
 |---|---|---|
-| Training | `https://csc53439ep.jdhp.org/training/api` | a world of your own, where you drive all the bugs, and which only advances when you call `step()` |
+| Training | `https://csc53439ep.jdhp.org/training/api` | a world of your own, where you drive all the bugs (4 of them, `agent_0` to `agent_3`: the server sets their number, and you cannot change it), and which only advances when you call `step()` |
 | Contest | `https://csc53439ep.jdhp.org/api` | one bug, named after you, in the world shared by all the participants |
 
 The [tutorial](TUTORIAL.md#3-training-mode-and-contest-mode) explains the differences between the
