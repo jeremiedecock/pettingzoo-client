@@ -163,3 +163,31 @@ python -m build --wheel               # build the wheel given to the participant
 
 The tests replace the HTTP session of the environment by a stand-in of the server, so they run
 offline; `pettingzoo-server` is the place where the two halves are tested together.
+
+### Publishing a new version
+
+The wheel is not on PyPI: the [`Publish wheel`](.github/workflows/publish-wheel.yml) GitHub
+Actions workflow attaches it to a GitHub release every time a `v*` tag is pushed. To publish
+version `X.Y.Z`:
+
+1. Set `version = "X.Y.Z"` in [`pyproject.toml`](pyproject.toml), and update the version in the
+   `pip install` URL of the [installation](#installation) section.
+2. Commit and push, then tag that commit and push the tag:
+
+   ```sh
+   git commit -am "Bump the version to X.Y.Z."
+   git push
+   git tag vX.Y.Z
+   git push origin vX.Y.Z
+   ```
+
+The workflow builds the wheel and the source distribution (`python -m build`), creates the
+`vX.Y.Z` release with generated notes, and attaches both files to it. The wheel can then be
+installed from
+`https://github.com/jeremiedecock/pettingzoo-client/releases/download/vX.Y.Z/pzclient-X.Y.Z-py3-none-any.whl`.
+The tag must match `version`, and nothing checks it: the name of the release comes from the tag,
+the name of the wheel from `pyproject.toml`.
+
+Re-running the workflow of an existing tag (*Re-run jobs* on its run, in the *Actions* tab)
+replaces the files of the release. Started by hand from a branch (*Run workflow*), it only builds
+the distributions, and leaves them as an artifact of the run.
