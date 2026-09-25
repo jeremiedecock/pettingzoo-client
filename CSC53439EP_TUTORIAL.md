@@ -308,7 +308,22 @@ for _ in range(10_000):  # the episode is eternal: bound the loop
 env.close()
 ```
 
-## 4. Tips
+## 4. Schedule of the contest
+
+Both servers, training and contest, are already open, and your token works on both.
+
+- **Train your agents in the training mode.** It is made for that: the world is yours, it waits for
+  you, and you drive all its agents (see [Training mode](#training-mode)).
+- **The contest mode is open for testing during the first four weeks of the course.** Use it to
+  check that your agent plays the shared world correctly (its clock, the other participants, the
+  disconnections). During these four weeks, the organizers ignore the results of your agents in
+  that mode.
+- **The contest officially takes place during the fifth week of the course**, from **Monday 19
+  October 2026, 00:00**, to **Wednesday 21 October 2026, 23:59** (Paris time).
+- **The organizers may add agents of their own to the shared world** at any time, whenever they
+  see fit.
+
+## 5. Tips
 
 - **Bound your loops**: the episode never ends by itself.
 - **Keep your agent fast** in the contest mode. Measure how long your policy takes
@@ -323,7 +338,7 @@ env.close()
 - **Call `close()`** when you stop playing (or use `with pettingzoo.make(...) as env:`), so that
   your agent leaves the world at once instead of playing the default action for a minute.
 
-## 5. Errors
+## 6. Errors
 
 Everything `pzclient` raises derives from `pzclient.RemoteEnvError`.
 
