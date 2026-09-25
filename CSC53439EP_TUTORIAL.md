@@ -113,7 +113,7 @@ all its agents if you like.
 - `close()` discards your world; the next `reset()` starts a fresh one.
 - Your world lives on the server as long as the server runs: a restart of the server loses it.
 - Your world belongs to your token, not to your program: the server cannot tell apart two programs
-  using the same token. **Do not run two programs with the same token** (two scripts, or a script
+  using the same token. **Do not run two programs with the same token** (two scripts, two notebooks, or a script
   and a notebook) on the training server: they drive the same world, and interfere with each other.
   Their steps interleave, so each program sees the world jump ahead between two of its calls, and
   receives observations and rewards that the actions of the other program shaped too; a `reset()`
@@ -130,7 +130,7 @@ it through their observations, and so do you.
 #### A simple training loop
 
 This complete program resets a world of your own, drives all its agents with random actions for
-10 000 steps, then discards the world.
+500 steps, then discards the world.
 
 ```python
 import pettingzoo
@@ -171,8 +171,9 @@ number of agents in the world changes while you play.
 #### The world has its own clock
 
 This is the most important difference with a local environment. Time is cut into **windows** of `T`
-seconds (the organizers announce `T`; 5 seconds by default), and each window ends with one step of
-the world:
+seconds, and each window ends with one step of the world. `T` is 5 seconds for now, but it may
+change depending on the lag observed between the clients and the server; the organizers will let
+you know if it does.
 
 1. A window opens as soon as the previous step has been played, at the same moment for everybody.
 2. If **every** connected participant sends its action before the end of the window, the step is
