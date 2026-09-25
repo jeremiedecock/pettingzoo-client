@@ -4,13 +4,12 @@ The client library of [`pettingzoo-server`](https://github.com/jeremiedecock/pet
 it makes a PettingZoo environment served over a REST API usable like a local one.
 
 This is the library the participants of the MARL contest install to connect their agent to the
-shared [`alife`](https://github.com/jeremiedecock/alife) world hosted by the organizers. The
-environment runs on the server, your agent runs on your machine, and everything in between is
-hidden behind the official [PettingZoo parallel
+shared world hosted by the organizers. The environment runs on the server, your agent runs on your
+machine, and everything in between is hidden behind the official [PettingZoo parallel
 API](https://pettingzoo.farama.org/api/parallel/).
 
-New to the contest? Read the [tutorial](TUTORIAL.md) first: it explains how the world of the contest
-behaves, and how to write an agent that plays it correctly.
+New to the contest? Read the [tutorial](CSC53439EP_TUTORIAL.md) first: it explains how the world
+of the contest behaves, and how to write an agent that plays it correctly.
 
 ## Installation
 
@@ -29,11 +28,11 @@ The organizers run two servers, one per mode; your token works on both:
 
 | Server | URL (`api_url`) | What you get |
 |---|---|---|
-| Training | `https://csc53439ep.jdhp.org/training/api` | a world of your own, where you drive all the bugs (4 of them, `agent_0` to `agent_3`: the server sets their number, and you cannot change it), and which only advances when you call `step()` |
-| Contest | `https://csc53439ep.jdhp.org/api` | one bug, named after you, in the world shared by all the participants |
+| Training | `https://csc53439ep.jdhp.org/training/api` | a world of your own, where you drive all the agents (4 of them, `agent_0` to `agent_3`: the server sets their number, and you cannot change it), and which only advances when you call `step()` |
+| Contest | `https://csc53439ep.jdhp.org/api` | one agent, named after you, in the world shared by all the participants |
 
-The [tutorial](TUTORIAL.md#3-training-mode-and-contest-mode) explains the differences between the
-two modes.
+The [tutorial](CSC53439EP_TUTORIAL.md#3-training-mode-and-contest-mode) explains the differences
+between the two modes.
 
 ## Quick start
 
@@ -43,7 +42,7 @@ import pzclient  # importing the library registers the remote environments
 
 env = pettingzoo.make(
     "parallel",
-    "alife/alife-remote-v1",
+    "csc53439ep/csc53439ep-remote-v1",
     api_url="https://csc53439ep.jdhp.org/training/api",  # the contest: https://csc53439ep.jdhp.org/api
     token="<your token>",
 )
@@ -85,14 +84,15 @@ These two environment variables are the defaults of the `api_url` and `token` ar
 
 The server knows you by your token alone, not by your program: two programs running with the same
 token on the same server (two scripts, or a script and a notebook) share the same world in the
-training mode and the same bug in the contest mode, and disrupt each other. Run one program per
-token and per server; the [tutorial](TUTORIAL.md#training-mode) details what goes wrong otherwise.
+training mode and the same agent in the contest mode, and disrupt each other. Run one program per
+token and per server; the [tutorial](CSC53439EP_TUTORIAL.md#training-mode) details what goes wrong
+otherwise.
 
 ## The registered environments
 
 | Id | Environment |
 |---|---|
-| `alife/alife-remote-v1` | The `alife` world of the contest; the constructor fails if the server serves anything else. |
+| `csc53439ep/csc53439ep-remote-v1` | The world of the contest; the constructor fails if the server serves anything else. |
 | `remote/parallel-v1` | Whatever parallel environment the server serves (useful to try your agent against an official PettingZoo environment). |
 
 ## The API
@@ -131,21 +131,20 @@ or their spaces) and `ServerUnreachableError` (the server could not be reached).
 
 ## What is special about the contest environment
 
-The `alife` world served during the contest departs from the usual PettingZoo assumptions on three
+The world served during the contest departs from the usual PettingZoo assumptions on three
 points, and your agent has to be written accordingly:
 
-- **The episode is eternal.** A bug that dies is reborn at a nest and keeps playing, so no agent
-  ever leaves `agents` and `while env.agents:` never ends. Bound your loop. A death is reported by
-  `infos[agent]["died"]` and by the death penalty in the reward, not by a termination.
+- **The episode is eternal.** No agent is ever terminated, so no agent ever leaves `agents` and
+  `while env.agents:` never ends. Bound your loop.
 - **The world is shared, and you control a single agent.** All the participants play the same
   world at the same time; `possible_agents` holds your agent alone, named after you. `reset()`
-  connects a brand new bug of yours to the running world (it does *not* reset the world, and its
+  connects a brand new agent of yours to the running world (it does *not* reset the world, and its
   `seed` and `options` arguments are ignored), and `close()` disconnects it. The participants join
-  and leave at any moment, so the number of bugs around you changes while you play.
+  and leave at any moment, so the number of agents in the world changes while you play.
 - **The world has its own clock.** Time is cut into windows of a few seconds (the step timeout of
   the server): a step is played at the end of each window, or as soon as every connected
   participant has sent its action, and `step()` blocks until then. An agent that has not answered
-  in time simply does nothing during that step, and the world goes on without it. An action that
+  in time plays a default action during that step, and the world goes on without it. An action that
   arrives after its step has been played is ignored (`step()` then returns at once, with the
   latest observation of your agent), and an agent that stops answering is eventually disconnected
   from the world. `infos[agent]["shared_world"]` tells what became of your action:
@@ -171,8 +170,8 @@ Actions workflow attaches it to a GitHub release every time a `v*` tag is pushed
 version `X.Y.Z`:
 
 1. Run `just bump X.Y.Z`: it sets `version = "X.Y.Z"` in [`pyproject.toml`](pyproject.toml) and
-   updates the `pip install` URLs of this README, of the [tutorial](TUTORIAL.md) and of the
-   [examples](examples/).
+   updates the `pip install` URLs of this README, of the [tutorial](CSC53439EP_TUTORIAL.md) and of
+   the [examples](examples/).
 2. Commit and push, then tag that commit and push the tag:
 
    ```sh

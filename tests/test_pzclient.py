@@ -632,7 +632,7 @@ def test_an_action_that_cannot_be_encoded_is_invalid(env):
 
 def test_the_remote_environments_are_registered():
     """Importing the library registers the environments of the contest."""
-    for env_id in ("alife/alife-remote-v1", "remote/parallel-v1"):
+    for env_id in ("csc53439ep/csc53439ep-remote-v1", "remote/parallel-v1"):
         assert env_id in pettingzoo.parallel_registry
 
 

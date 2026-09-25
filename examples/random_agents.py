@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Play the `alife` world of the MARL contest with random agents.
+Play the world of the MARL contest with random agents.
 
 This script is the starting point given to the participants of the contest: it
-connects to the shared `alife` world served by `pettingzoo-server`, plays it
+connects to the shared world served by `pettingzoo-server`, plays it
 with a random policy and reports what happened.  Replace `policy` by your own
 agent and you are done.
 
@@ -11,9 +11,9 @@ The client library makes the remote environment a plain PettingZoo environment,
 so the loop below is the usual PettingZoo parallel loop::
 
     import pettingzoo
-    import pzclient  # registers "alife/alife-remote-v1"
+    import pzclient  # registers "csc53439ep/csc53439ep-remote-v1"
 
-    env = pettingzoo.make("parallel", "alife/alife-remote-v1", token="...")
+    env = pettingzoo.make("parallel", "csc53439ep/csc53439ep-remote-v1", token="...")
 
     observations, infos = env.reset()
 
@@ -26,15 +26,15 @@ so the loop below is the usual PettingZoo parallel loop::
 
 Two things are worth knowing about this environment:
 
-- **the episode is eternal**: an agent that dies is reborn at a nest instead of
-  leaving the episode, so ``env.agents`` never becomes empty and
-  ``while env.agents:`` never ends.  Bound your loop, as ``--steps`` does here.
+- **the episode is eternal**: no agent ever leaves the episode, so
+  ``env.agents`` never becomes empty and ``while env.agents:`` never ends.
+  Bound your loop, as ``--steps`` does here.
 - **the world is shared**: the other participants play the same world at the
   same time, and each of you controls a single agent (``env.agents`` holds your
   agent alone).  The world has its own clock: a step is played at the end of
   each window of the step timeout of the server, or as soon as every connected
-  participant has sent its action.  An agent that thinks for too long simply
-  does nothing during that step (``infos[agent]["shared_world"]`` tells whether
+  participant has sent its action.  An agent that thinks for too long plays a
+  default action during that step (``infos[agent]["shared_world"]`` tells whether
   its action was played).
 
 Usage
@@ -71,18 +71,17 @@ import pettingzoo
 # PettingZoo registry
 import pzclient
 
-# The remote `alife` world of the contest, served by "pettingzoo-server"
-ENV_ID = "alife/alife-remote-v1"
+# The remote world of the contest, served by "pettingzoo-server"
+ENV_ID = "csc53439ep/csc53439ep-remote-v1"
 
 
 def policy(observation: np.ndarray, action_space: spaces.Space) -> Any:
     """
     Choose the action of one agent.
 
-    **This is the function to replace by your own agent.**  The observation of
-    an `alife` bug is a vector of sensors (the colors seen by its two antennae,
-    its collisions, its energy, its compass and its speed) and its action is a
-    binary vector (its two actuators).
+    **This is the function to replace by your own agent.**  The observation is
+    a vector of floats and the action a binary vector: see the observation and
+    action spaces of the agent.
 
     Parameters
     ----------
@@ -174,7 +173,7 @@ def main() -> int:
         print(error, file=sys.stderr)
         return 1
 
-    print(f"Environment: {env.env_id} on {env.api_url}")
+    print(f"Server:      {env.api_url}")
     print(f"Your agents: {', '.join(env.possible_agents)}")
     print(f"Observation: {env.observation_space(env.possible_agents[0])}")
     print(f"Action:      {env.action_space(env.possible_agents[0])}")
@@ -189,12 +188,11 @@ def main() -> int:
         args.frames_dir.mkdir(parents=True, exist_ok=True)
 
     cumulative_rewards: dict[str, float] = {}
-    deaths: dict[str, int] = {}
     step = 0
 
     try:
         # Connect the agent to the shared world and get its first observation
-        observations, infos = env.reset()
+        observations, _ = env.reset()
 
         # The episode is eternal: the loop is bounded by "--steps" rather than
         # by the usual "while env.agents:"
@@ -204,17 +202,11 @@ def main() -> int:
                 for agent in env.agents
             }
 
-            observations, rewards, terminations, truncations, infos = env.step(actions)
+            observations, rewards, terminations, truncations, _ = env.step(actions)
             step += 1
 
             for agent, reward in rewards.items():
                 cumulative_rewards[agent] = cumulative_rewards.get(agent, 0.0) + reward
-
-                # An `alife` bug that dies is reborn at a nest and keeps
-                # playing: its death is reported by its info, not by a
-                # termination
-                if infos[agent].get("died", False):
-                    deaths[agent] = deaths.get(agent, 0) + 1
 
             if any(terminations.values()) or any(truncations.values()):
                 # The episode of the contest world is eternal, so this should
@@ -237,8 +229,7 @@ def main() -> int:
             if not args.quiet:
                 print(f"step {step:>5} | "
                       f"reward: {sum(rewards.values()):>+8.3f} | "
-                      f"total: {sum(cumulative_rewards.values()):>+9.3f} | "
-                      f"deaths: {sum(deaths.values()):>3}")
+                      f"total: {sum(cumulative_rewards.values()):>+9.3f}")
 
     except KeyboardInterrupt:
         print("\nInterrupted.")
@@ -247,15 +238,14 @@ def main() -> int:
         return 1
     finally:
         # Always close the environment: this is how your agent leaves the
-        # shared world, instead of standing there until the server drops it
+        # shared world, instead of staying connected until the server drops it
         env.close()
 
     print()
     print(f"Played {step} steps.")
 
     for agent in sorted(cumulative_rewards):
-        print(f"  {agent}: total reward {cumulative_rewards[agent]:+.3f}, "
-              f"{deaths.get(agent, 0)} death(s)")
+        print(f"  {agent}: total reward {cumulative_rewards[agent]:+.3f}")
 
     if args.frames_dir is not None:
         print(f"Frames saved in {args.frames_dir}/")

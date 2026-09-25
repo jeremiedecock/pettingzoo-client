@@ -18,15 +18,15 @@ import os
 
 import pettingzoo
 
-# Importing pzclient registers "alife/alife-remote-v1" in the PettingZoo registry
+# Importing pzclient registers "csc53439ep/csc53439ep-remote-v1" in the PettingZoo registry
 import pzclient  # noqa: F401
 
 env = pettingzoo.make(
     "parallel",
-    "alife/alife-remote-v1",
+    "csc53439ep/csc53439ep-remote-v1",
     api_url="https://csc53439ep.jdhp.org/training/api",  # the training server
     token=os.environ["USER_TOKEN"],
-    render_mode="human",
+    render_mode=None,
 )
 
 print(f"{os.environ['USER_NAME']} drives {env.possible_agents}")

@@ -12,7 +12,7 @@ registers the remote environments in the PettingZoo registry, so that the usual
     >>> import pzclient
     >>> env = pettingzoo.make(                      # doctest: +SKIP
     ...     "parallel",
-    ...     "alife/alife-remote-v1",
+    ...     "csc53439ep/csc53439ep-remote-v1",
     ...     api_url="https://csc53439ep.jdhp.org/api",
     ...     token="<YOUR_SECRET_TOKEN>",
     ... )
@@ -24,13 +24,15 @@ same thing without the registry.  The ``PETTINGZOO_API_URL`` and
 
 Two environment ids are registered:
 
-===========================  ==================================================
-Id                           Environment
-===========================  ==================================================
-``alife/alife-remote-v1``    The `alife` world of the contest; the constructor
-                             fails if the server serves anything else.
-``remote/parallel-v1``       Whatever parallel environment the server serves.
-===========================  ==================================================
+===================================  ==========================================
+Id                                   Environment
+===================================  ==========================================
+``csc53439ep/csc53439ep-remote-v1``  The `alife` world of the contest; the
+                                     constructor fails if the server serves
+                                     anything else.
+``remote/parallel-v1``               Whatever parallel environment the server
+                                     serves.
+===================================  ==========================================
 
 Viewing documentation using IPython
 -----------------------------------

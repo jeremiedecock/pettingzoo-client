@@ -10,7 +10,7 @@ participant), it is used exactly like a local PettingZoo environment::
     import pettingzoo
     import pzclient  # registers the remote environments
 
-    env = pettingzoo.make("parallel", "alife/alife-remote-v1", token="<YOUR_SECRET_TOKEN>")
+    env = pettingzoo.make("parallel", "csc53439ep/csc53439ep-remote-v1", token="<YOUR_SECRET_TOKEN>")
 
     observations, infos = env.reset()
 
@@ -681,7 +681,7 @@ def alife_parallel_env(**kwargs: Any) -> RemoteParallelEnv:
     """
     Instantiate the `alife` environment of the contest, served remotely.
 
-    This factory is the entry point registered as ``"alife/alife-remote-v1"``
+    This factory is the entry point registered as ``"csc53439ep/csc53439ep-remote-v1"``
     in the PettingZoo registry.  It is `parallel_env` with a check: the server
     must really serve the `alife` environment of the contest.
 
