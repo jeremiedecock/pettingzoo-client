@@ -23,8 +23,8 @@ The library itself is installed from the GitHub release of `pzclient` (Python 3.
 preferably in a virtual environment of its own:
 
 ```sh
-python3 -m venv .venv          # create the virtual environment, once
-source .venv/bin/activate      # activate it, in every new shell (Windows: .venv\Scripts\activate)
+python3 -m venv env          # create the virtual environment, once
+source env/bin/activate      # activate it, in every new shell (Windows: .venv\Scripts\activate)
 
 pip install https://github.com/jeremiedecock/pettingzoo-client/releases/download/v0.4.0/pzclient-0.4.0-py3-none-any.whl
 ```
@@ -145,13 +145,11 @@ env = pettingzoo.make(
 
 observations, infos = env.reset(seed=42)  # a fresh world of your own
 
-for _ in range(10_000):  # the episode is eternal: bound the loop
+for _ in range(500):  # the episode is eternal: bound the loop
     # One action per agent of env.agents: replace the random actions by your policy
     actions = {agent: env.action_space(agent).sample() for agent in env.agents}
     observations, rewards, terminations, truncations, infos = env.step(actions)
-
-    if not env.agents:  # only if the organizers set a maximum episode length
-        observations, infos = env.reset()
+    print(rewards)
 
 env.close()  # discard your world
 ```
@@ -245,6 +243,7 @@ observations, infos = env.reset()  # join the shared world
 for _ in range(500):  # the episode is eternal: bound the loop
     actions = {agent: env.action_space(agent).sample()}  # replace by your policy
     observations, rewards, terminations, truncations, infos = env.step(actions)
+    print(rewards)
 
 env.close()  # leave the shared world
 ```
