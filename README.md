@@ -14,7 +14,7 @@ of the contest behaves, and how to write an agent that plays it correctly.
 ## Installation
 
 ```sh
-pip install https://github.com/jeremiedecock/pettingzoo-client/releases/download/v0.3.1/pzclient-0.3.1-py3-none-any.whl
+pip install https://github.com/jeremiedecock/pettingzoo-client/releases/download/v0.4.0/pzclient-0.4.0-py3-none-any.whl
 ```
 
 The wheel is attached to the [GitHub releases](https://github.com/jeremiedecock/pettingzoo-client/releases)

@@ -26,7 +26,7 @@ preferably in a virtual environment of its own:
 python3 -m venv .venv          # create the virtual environment, once
 source .venv/bin/activate      # activate it, in every new shell (Windows: .venv\Scripts\activate)
 
-pip install https://github.com/jeremiedecock/pettingzoo-client/releases/download/v0.3.1/pzclient-0.3.1-py3-none-any.whl
+pip install https://github.com/jeremiedecock/pettingzoo-client/releases/download/v0.4.0/pzclient-0.4.0-py3-none-any.whl
 ```
 
 Once it is installed, the remote world is built with the standard `pettingzoo.make`, from the URL of
