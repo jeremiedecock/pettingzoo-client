@@ -171,7 +171,7 @@ number of agents in the world changes while you play.
 #### The world has its own clock
 
 This is the most important difference with a local environment. Time is cut into **windows** of `T`
-seconds, and each window ends with one step of the world. `T` is 5 seconds for now, but it may
+seconds, and each window ends with one step of the world. `T` is 2 seconds for now, but it may
 change depending on the lag observed between the clients and the server; the organizers will let
 you know if it does.
 
@@ -213,7 +213,7 @@ step only: the observations and the rewards of the steps before it are lost for 
 
 Your agent is removed from the world when:
 
-- it misses **12 steps in a row** (about one minute with `T = 5 s`): your program crashed, stopped
+- it misses **15 steps in a row** (about 30 seconds with `T = 2 s`): your program crashed, stopped
   without calling `close()`, or is always slower than `T`. An ignored action counts as a miss;
 - the server restarts (the organizers will announce it). While it restarts, your calls fail with
   `pzclient.ServerUnreachableError`, or with a `pzclient.RemoteEnvError` whose `status_code` is
